@@ -632,7 +632,19 @@
         async function loadContributors() {
             try {
                 const res = await fetch(`${DAO_FORMS_ENDPOINT}?recipients=true`);
-                allContributors = await res.json();
+                const data = await res.json();
+                let contributors = [];
+                if (data.status === 'success' && data.data && data.data.contributors) {
+                    contributors = data.data.contributors;
+                } else if (Array.isArray(data)) {
+                    contributors = data;
+                }
+                allContributors = contributors
+                    .filter(c => c.name && c.name.trim())
+                    .map(c => ({
+                        key: encodeURIComponent(c.name.trim()),
+                        name: c.name.trim()
+                    }));
                 updateContributorAutocomplete();
                 
                 // Auto-select current contributor if available

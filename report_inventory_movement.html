@@ -1943,8 +1943,19 @@
         async function loadRecipients() {
             try {
                 const res = await fetch(`${DAO_FORMS_BASE}?recipients=true`);
-                const recs = await res.json();
-                recipientsList = recs;
+                const data = await res.json();
+                let contributors = [];
+                if (data.status === 'success' && data.data && data.data.contributors) {
+                    contributors = data.data.contributors;
+                } else if (Array.isArray(data)) {
+                    contributors = data;
+                }
+                recipientsList = contributors
+                    .filter(c => c.name && c.name.trim())
+                    .map(c => ({
+                        key: encodeURIComponent(c.name.trim()),
+                        name: c.name.trim()
+                    }));
                 
                 const display = document.getElementById('recipientSelectDisplay');
                 if (display) {
