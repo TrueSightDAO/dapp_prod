@@ -1138,6 +1138,7 @@
 
                     output.innerHTML = `Report sent to Edgar successfully. <br>View: <a id="telegramLink" href="https://truesight.me/submissions/raw-telegram-chatlogs" target="_blank">https://truesight.me/submissions/raw-telegram-chatlogs</a>`;
                     output.className = 'status';
+                    renderContributionSummary(requestHash, contributorNames, typeName, hoursInput.value, minutesInput.value, amount, description, tdgValues, contributionLocation, fileName);
                     isPostSubmission = true;
                     updateButtonText();
                 } else {
