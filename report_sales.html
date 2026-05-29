@@ -173,6 +173,74 @@
             text-decoration: underline;
             cursor: pointer;
         }
+        #salesSummary {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            display: none;
+        }
+        #salesSummary h3 {
+            margin: 0 0 0.8rem 0;
+            color: #28a745;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        #salesSummary .summary-row {
+            margin: 0.4rem 0;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        #salesSummary .summary-row:last-child {
+            border-bottom: none;
+        }
+        #salesSummary .summary-label {
+            font-weight: bold;
+            color: #555;
+        }
+        #salesSummary .summary-value {
+            color: #333;
+            word-break: break-word;
+        }
+        #salesSummary .summary-value a {
+            color: #007bff;
+            text-decoration: underline;
+        }
+        #txHashDisplay {
+            margin: 1rem 0;
+            padding: 0.6rem;
+            background-color: #f0f8ff;
+            border: 1px solid #b3d4fc;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            word-break: break-all;
+            text-align: center;
+            display: none;
+        }
+        #txHashDisplay .tx-label {
+            font-weight: bold;
+            color: #333;
+        }
+        #txHashDisplay .tx-value {
+            font-family: monospace;
+            color: #0056b3;
+            font-size: 0.8rem;
+        }
+        @media print {
+            #salesSummary {
+                border: 2px solid #000 !important;
+                background: #fff !important;
+                display: block !important;
+            }
+            #txHashDisplay {
+                border: 1px solid #000 !important;
+                background: #fff !important;
+                display: block !important;
+            }
+        }
         .button-row {
             display: flex;
             flex-wrap: wrap;
@@ -384,7 +452,54 @@
             <div class="button-row">
                 <input type="button" id="report_button" value="Report Sold" disabled>
             </div>
-            <div id="report_output" aria-live="polite"></div>            
+            <div id="report_output" aria-live="polite"></div>
+            <div id="txHashDisplay">
+                <span class="tx-label">Transaction Hash (Request ID):</span><br>
+                <span class="tx-value" id="txHashValue"></span>
+            </div>
+            <div id="salesSummary">
+                <h3>✅ Sales Summary</h3>
+                <div class="summary-row">
+                    <span class="summary-label">QR Code:</span>
+                    <span class="summary-value" id="summaryQrCode"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Sale Price:</span>
+                    <span class="summary-value" id="summarySalePrice"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Sold By:</span>
+                    <span class="summary-value" id="summarySoldBy"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Cash Proceeds Collected By:</span>
+                    <span class="summary-value" id="summaryCashProceeds"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Owner Email:</span>
+                    <span class="summary-value" id="summaryOwnerEmail"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Stripe Session ID:</span>
+                    <span class="summary-value" id="summaryStripeSession"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Shipping Provider:</span>
+                    <span class="summary-value" id="summaryShippingProvider"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Tracking Number:</span>
+                    <span class="summary-value" id="summaryTrackingNumber"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Transaction Hash:</span>
+                    <span class="summary-value" id="summaryTxHash"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Submission Timestamp:</span>
+                    <span class="summary-value" id="summaryTimestamp"></span>
+                </div>
+            </div>
         </div>
     </div>
     <!-- Include jsQR library via CDN -->
@@ -874,6 +989,13 @@
             cashProceedsIndependentFromSoldBy = false;
             if (cashProceedsSelect) cashProceedsSelect.value = '';
             clearSalesMetadataFields();
+            
+            // Hide transaction hash and sales summary on reset
+            const txHashDisplay = document.getElementById('txHashDisplay');
+            if (txHashDisplay) txHashDisplay.style.display = 'none';
+            const salesSummary = document.getElementById('salesSummary');
+            if (salesSummary) salesSummary.style.display = 'none';
+            
             updateReportButtonState();
         }
 
@@ -1273,6 +1395,26 @@
             await submitSalesReport(fileToShare, fileName, lastQrParam, contributorSelect.value, cashProceedsSelect ? cashProceedsSelect.value : contributorSelect.value, salePrice);
         }
 
+        function renderSalesSummary(requestHash, qrParam, salePrice, soldByName, cashName, ownerEmailVal, stripeSessionVal, shippingProvVal, trackingVal) {
+            const txHashDisplay = document.getElementById('txHashDisplay');
+            const txHashValue = document.getElementById('txHashValue');
+            txHashValue.textContent = requestHash;
+            txHashDisplay.style.display = 'block';
+
+            const summary = document.getElementById('salesSummary');
+            document.getElementById('summaryQrCode').textContent = qrParam || 'N/A';
+            document.getElementById('summarySalePrice').textContent = `$${parseFloat(salePrice).toFixed(2)}`;
+            document.getElementById('summarySoldBy').textContent = soldByName || 'N/A';
+            document.getElementById('summaryCashProceeds').textContent = cashName || 'N/A';
+            document.getElementById('summaryOwnerEmail').textContent = ownerEmailVal || '(none)';
+            document.getElementById('summaryStripeSession').textContent = stripeSessionVal || '(none)';
+            document.getElementById('summaryShippingProvider').textContent = shippingProvVal || '(none)';
+            document.getElementById('summaryTrackingNumber').textContent = trackingVal || '(none)';
+            document.getElementById('summaryTxHash').textContent = requestHash;
+            document.getElementById('summaryTimestamp').textContent = new Date().toLocaleString();
+            summary.style.display = 'block';
+        }
+
         async function submitSalesReport(file, fileName, qrParam, soldByName, cashProceedsCollectedByName, salePrice) {
             const publicKey = localStorage.getItem('publicKey');
             const privateKey = localStorage.getItem('privateKey');
@@ -1323,6 +1465,9 @@
                     isPostSubmission = true;
                     reportButton.value = 'Report Another Sale';
                     updateReportButtonState();
+                    
+                    // Show transaction hash and sales summary
+                    renderSalesSummary(requestHash, qrParam, salePrice, soldByName, cashName, ownerEmailVal, stripeSessionVal, shippingProvVal, trackingVal);
                 } else {
                     if (isMobileDevice()) {
                         if (navigator.share) {
@@ -1340,6 +1485,8 @@
                                 reportOutput.innerHTML += '<br>Copied to clipboard!';
                             }
                         }
+                        // Show transaction hash and sales summary
+                        renderSalesSummary(requestHash, qrParam, salePrice, soldByName, cashName, ownerEmailVal, stripeSessionVal, shippingProvVal, trackingVal);
                     } else {
                         if (await copyToClipboard(shareText)) {
                             reportOutput.innerHTML = `Internet or server not available. Report copied to clipboard. Please paste it into our <a href="${telegramLink}" target="_blank">Telegram</a> or <a href="${whatsappLink}" target="_blank">WhatsApp</a> channels.`;
@@ -1348,6 +1495,8 @@
                             reportOutput.innerHTML = `Internet or server not available and clipboard copy failed. Please manually copy the report below and share it to our <a href="${telegramLink}" target="_blank">Telegram</a> or <a href="${whatsappLink}" target="_blank">WhatsApp</a> channels:<br><br><pre>${shareText}</pre>`;
                             reportOutput.className = 'error';
                         }
+                        // Show transaction hash and sales summary
+                        renderSalesSummary(requestHash, qrParam, salePrice, soldByName, cashName, ownerEmailVal, stripeSessionVal, shippingProvVal, trackingVal);
                     }
                 }
             } catch (err) {
