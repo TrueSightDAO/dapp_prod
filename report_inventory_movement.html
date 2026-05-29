@@ -206,6 +206,74 @@
             max-width: 100%;
             word-wrap: break-word;
         }
+        #txHashDisplay {
+            margin: 1rem 0;
+            padding: 0.6rem;
+            background-color: #f0f8ff;
+            border: 1px solid #b3d4fc;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            word-break: break-all;
+            text-align: center;
+            display: none;
+        }
+        #txHashDisplay .tx-label {
+            font-weight: bold;
+            color: #333;
+        }
+        #txHashDisplay .tx-value {
+            font-family: monospace;
+            color: #0056b3;
+            font-size: 0.8rem;
+        }
+        #movementSummary {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            display: none;
+        }
+        #movementSummary h3 {
+            margin: 0 0 0.8rem 0;
+            color: #28a745;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        #movementSummary .summary-row {
+            margin: 0.4rem 0;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        #movementSummary .summary-row:last-child {
+            border-bottom: none;
+        }
+        #movementSummary .summary-label {
+            font-weight: bold;
+            color: #555;
+        }
+        #movementSummary .summary-value {
+            color: #333;
+            word-break: break-word;
+        }
+        #movementSummary .summary-value a {
+            color: #007bff;
+            text-decoration: underline;
+        }
+        @media print {
+            #movementSummary {
+                border: 2px solid #000 !important;
+                background: #fff !important;
+                display: block !important;
+            }
+            #txHashDisplay {
+                border: 1px solid #000 !important;
+                background: #fff !important;
+                display: block !important;
+            }
+        }
         .info-box {
             margin: 1rem 0;
             background-color: #f8f9fa;
@@ -412,6 +480,49 @@
             <button id="reportButton" disabled aria-label="Report Inventory Movement">Report Inventory Movement</button>
             <button id="batchSubmitButton" style="display: none; background-color: #28a745; margin-top: 0.5rem;" aria-label="Batch Submit">Batch Submit (0)</button>
             <div id="reportOutput" aria-live="polite"></div>
+            <div id="txHashDisplay">
+                <span class="tx-label">Transaction Hash (Request ID):</span><br>
+                <span class="tx-value" id="txHashValue"></span>
+            </div>
+            <div id="movementSummary">
+                <h3>✅ Inventory Movement Summary</h3>
+                <div class="summary-row">
+                    <span class="summary-label">Manager Name:</span>
+                    <span class="summary-value" id="summaryManagerName"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Recipient Name:</span>
+                    <span class="summary-value" id="summaryRecipientName"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Inventory Item:</span>
+                    <span class="summary-value" id="summaryInventoryItem"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">QR Code:</span>
+                    <span class="summary-value" id="summaryQrCode"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Quantity Moved:</span>
+                    <span class="summary-value" id="summaryQuantity"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Location:</span>
+                    <span class="summary-value" id="summaryLocation"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Transaction Hash:</span>
+                    <span class="summary-value" id="summaryTxHash"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">File Location:</span>
+                    <span class="summary-value" id="summaryFileLocation"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Submission Timestamp:</span>
+                    <span class="summary-value" id="summaryTimestamp"></span>
+                </div>
+            </div>
         </div>
     </div>
     <!-- Include jsQR library via CDN -->
@@ -879,6 +990,28 @@
             
             output.innerHTML = `Batch complete: ${successCount}/${codes.length} submitted. <a href="https://truesight.me/submissions/raw-telegram-chatlogs" target="_blank">View Telegram Chat Logs</a>`;
             output.className = 'status';
+            
+            // Show batch summary with transaction hash
+            const recipientName = getRecipientName();
+            const publicKey = localStorage.getItem('publicKey');
+            const batchSummaryHash = arrayBufferToBase64(new TextEncoder().encode(`batch_${Date.now()}_${publicKey}`));
+            const txHashDisplay = document.getElementById('txHashDisplay');
+            const txHashValue = document.getElementById('txHashValue');
+            txHashValue.textContent = batchSummaryHash;
+            txHashDisplay.style.display = 'block';
+            
+            const summary = document.getElementById('movementSummary');
+            document.getElementById('summaryManagerName').textContent = `${codes.length} QR code(s)`;
+            document.getElementById('summaryRecipientName').textContent = recipientName;
+            document.getElementById('summaryInventoryItem').textContent = 'Multiple items (see batch)';
+            document.getElementById('summaryQrCode').textContent = codes.map(c => c.name).join(', ');
+            document.getElementById('summaryQuantity').textContent = codes.length;
+            document.getElementById('summaryLocation').textContent = `${latitude}, ${longitude}`;
+            document.getElementById('summaryTxHash').textContent = batchSummaryHash;
+            document.getElementById('summaryFileLocation').textContent = 'No file attached';
+            document.getElementById('summaryTimestamp').textContent = new Date().toLocaleString();
+            summary.style.display = 'block';
+            
             batchQRList = [];
             refreshBatchList();
             batchBtn.disabled = false;
@@ -1713,6 +1846,12 @@
                 outputEl.textContent = '';
                 outputEl.className = '';
             }
+            
+            // Hide transaction hash and movement summary on reset
+            const txHashDisplay = document.getElementById('txHashDisplay');
+            if (txHashDisplay) txHashDisplay.style.display = 'none';
+            const movementSummary = document.getElementById('movementSummary');
+            if (movementSummary) movementSummary.style.display = 'none';
             
             updateReportButtonState();
         }
@@ -2596,6 +2735,32 @@
             }
         }
 
+        function renderInventoryMovementSummary(requestHash, managerName, recipientName, itemName, qrCode, quantity, lat, lng, inventoryLocation, fileName) {
+            const txHashDisplay = document.getElementById('txHashDisplay');
+            const txHashValue = document.getElementById('txHashValue');
+            txHashValue.textContent = requestHash;
+            txHashDisplay.style.display = 'block';
+
+            const summary = document.getElementById('movementSummary');
+            document.getElementById('summaryManagerName').textContent = managerName || 'N/A';
+            document.getElementById('summaryRecipientName').textContent = recipientName;
+            document.getElementById('summaryInventoryItem').textContent = itemName;
+            document.getElementById('summaryQrCode').textContent = qrCode || 'N/A';
+            document.getElementById('summaryQuantity').textContent = quantity;
+            document.getElementById('summaryLocation').textContent = `${lat}, ${lng}`;
+            document.getElementById('summaryTxHash').textContent = requestHash;
+
+            const fileLocationEl = document.getElementById('summaryFileLocation');
+            if (inventoryLocation && inventoryLocation !== 'No file attached' && inventoryLocation !== 'N/A') {
+                fileLocationEl.innerHTML = `<a href="${inventoryLocation}" target="_blank">${inventoryLocation}</a>`;
+            } else {
+                fileLocationEl.textContent = inventoryLocation || 'No file attached';
+            }
+
+            document.getElementById('summaryTimestamp').textContent = new Date().toLocaleString();
+            summary.style.display = 'block';
+        }
+
         async function onReport() {
             const reportBtn = document.getElementById('reportButton');
             const output = document.getElementById('reportOutput');
@@ -2753,6 +2918,9 @@
                     updateButtonText();
                     updateReportButtonState();
                     
+                    // Show transaction hash and inventory movement summary
+                    renderInventoryMovementSummary(requestHash, managerName, recipientName, formattedItemName, lastQrParam, quantity, latitude, longitude, inventoryLocation, fileName);
+                    
                     // If a new recipient was added, add it to the local list immediately
                     // This ensures it's available for the next submission even before backend sync
                     const newRecipientInput = document.getElementById('newRecipientInput');
@@ -2797,6 +2965,8 @@
                             output.className = 'error';
                         }
                     }
+                    // Show transaction hash and inventory movement summary even in offline/clipboard mode
+                    renderInventoryMovementSummary(requestHash, managerName, recipientName, formattedItemName, lastQrParam, quantity, latitude, longitude, inventoryLocation, fileName);
                 }
             } catch (err) {
                 output.innerHTML = `Error generating inventory report: ${err.message}. Please try again or contact support.`;
