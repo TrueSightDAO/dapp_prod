@@ -227,6 +227,74 @@
             text-decoration: underline;
             cursor: pointer;
         }
+        #txHashDisplay {
+            margin: 1rem 0;
+            padding: 0.6rem;
+            background-color: #f0f8ff;
+            border: 1px solid #b3d4fc;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            word-break: break-all;
+            text-align: center;
+            display: none;
+        }
+        #txHashDisplay .tx-label {
+            font-weight: bold;
+            color: #333;
+        }
+        #txHashDisplay .tx-value {
+            font-family: monospace;
+            color: #0056b3;
+            font-size: 0.8rem;
+        }
+        #contributionSummary {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            display: none;
+        }
+        #contributionSummary h3 {
+            margin: 0 0 0.8rem 0;
+            color: #28a745;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        #contributionSummary .summary-row {
+            margin: 0.4rem 0;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        #contributionSummary .summary-row:last-child {
+            border-bottom: none;
+        }
+        #contributionSummary .summary-label {
+            font-weight: bold;
+            color: #555;
+        }
+        #contributionSummary .summary-value {
+            color: #333;
+            word-break: break-word;
+        }
+        #contributionSummary .summary-value a {
+            color: #007bff;
+            text-decoration: underline;
+        }
+        @media print {
+            #contributionSummary {
+                border: 2px solid #000 !important;
+                background: #fff !important;
+                display: block !important;
+            }
+            #txHashDisplay {
+                border: 1px solid #000 !important;
+                background: #fff !important;
+                display: block !important;
+            }
+        }
         .fade-in {
             animation: fadeIn 0.5s ease-in;
         }
@@ -419,6 +487,41 @@
             </div>
             <button id="submitButton" disabled>Submit Contribution Report</button>
             <div id="outputMessage"></div>
+            <div id="txHashDisplay">
+                <span class="tx-label">Transaction Hash (Request ID):</span><br>
+                <span class="tx-value" id="txHashValue"></span>
+            </div>
+            <div id="contributionSummary">
+                <h3>✅ Contribution Summary</h3>
+                <div class="summary-row">
+                    <span class="summary-label">Contributor(s):</span>
+                    <span class="summary-value" id="summaryContributors"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Contribution Type:</span>
+                    <span class="summary-value" id="summaryType"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Description:</span>
+                    <span class="summary-value" id="summaryDescription"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">TDG Issued:</span>
+                    <span class="summary-value" id="summaryTDG"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Transaction Hash:</span>
+                    <span class="summary-value" id="summaryTxHash"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">File Location:</span>
+                    <span class="summary-value" id="summaryFileLocation"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Submission Timestamp:</span>
+                    <span class="summary-value" id="summaryTimestamp"></span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -979,6 +1082,43 @@
             await submitReport(file, fileName, typeName, amount);
         }
 
+        function renderContributionSummary(requestHash, contributorNames, typeName, amount, hoursInput, minutesInput, description, tdgValues, contributionLocation, fileName) {
+            const txHashDisplay = document.getElementById('txHashDisplay');
+            const txHashValue = document.getElementById('txHashValue');
+            txHashValue.textContent = requestHash;
+            txHashDisplay.style.display = 'block';
+
+            const summary = document.getElementById('contributionSummary');
+            document.getElementById('summaryContributors').textContent = contributorNames.join(', ');
+            
+            let typeText = '';
+            if (typeName === 'Time') {
+                const h = parseInt(hoursInput.value || 0);
+                const m = parseInt(minutesInput.value || 0);
+                typeText = `Time: ${h} hour${h !== 1 ? 's' : ''} ${m} minute${m !== 1 ? 's' : ''}`;
+            } else {
+                typeText = `USD: $${parseFloat(amount).toFixed(2)}`;
+            }
+            document.getElementById('summaryType').textContent = typeText;
+            document.getElementById('summaryDescription').textContent = description;
+            
+            const tdgPerContributor = tdgValues[0];
+            document.getElementById('summaryTDG').textContent = `${tdgPerContributor} TDG per contributor (${contributorNames.length} contributor${contributorNames.length !== 1 ? 's' : ''})`;
+            
+            document.getElementById('summaryTxHash').textContent = requestHash;
+            
+            const fileLocationEl = document.getElementById('summaryFileLocation');
+            if (contributionLocation && contributionLocation !== 'No file attached' && contributionLocation !== 'See description (URL(s))') {
+                fileLocationEl.innerHTML = `<a href="${contributionLocation}" target="_blank">${contributionLocation}</a>`;
+            } else {
+                fileLocationEl.textContent = contributionLocation || 'No file attached';
+            }
+            
+            document.getElementById('summaryTimestamp').textContent = new Date().toLocaleString();
+            
+            summary.style.display = 'block';
+        }
+
         async function submitReport(file, fileName, typeName, amount) {
             const contributorNames = selectedContributors.map(c => c.name);
             const hoursInput = document.getElementById('hoursInput');
@@ -1053,6 +1193,9 @@
                     output.className = 'status';
                     isPostSubmission = true;
                     updateButtonText();
+                    
+                    // Show transaction hash and contribution summary
+                    renderContributionSummary(requestHash, contributorNames, typeName, amount, hoursInput, minutesInput, description, tdgValues, contributionLocation, fileName);
                 } else {
                     if (isMobileDevice()) {
                         if (navigator.share) {
@@ -1079,6 +1222,9 @@
                             output.className = 'error';
                         }
                     }
+                    
+                    // Show transaction hash and contribution summary even in offline/clipboard mode
+                    renderContributionSummary(requestHash, contributorNames, typeName, amount, hoursInput, minutesInput, description, tdgValues, contributionLocation, fileName);
                 }
             } catch (err) {
                 output.innerHTML = `Error generating contribution report: ${err.message}. Please try again or contact support.`;
@@ -1267,6 +1413,10 @@
             usdInput.disabled = true;
 
             document.getElementById('tdgOutput').textContent = '';
+
+            // Hide transaction hash and contribution summary on reset
+            document.getElementById('txHashDisplay').style.display = 'none';
+            document.getElementById('contributionSummary').style.display = 'none';
 
             updateContributorAutocomplete();
 
