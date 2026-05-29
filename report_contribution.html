@@ -1151,20 +1151,24 @@
                             await navigator.share(shareData);
                             output.innerHTML = `Internet is not available. Please share the report to our <a href="${telegramLink}" target="_blank">Telegram</a> or <a href="${whatsappLink}" target="_blank">WhatsApp</a> channels.`;
                             output.className = 'error';
+                            renderContributionSummary(requestHash, contributorNames, typeName, hoursInput.value, minutesInput.value, amount, description, tdgValues, contributionLocation, fileName);
                         } else {
                             output.innerHTML = `Internet is not available and share API is not supported. Please copy the report below and share it to our <a href="${telegramLink}" target="_blank">Telegram</a> or <a href="${whatsappLink}" target="_blank">WhatsApp</a> channels:<br><br><pre>${shareText}</pre>`;
                             output.className = 'error';
                             if (await copyToClipboard(shareText)) {
                                 output.innerHTML += '<br>Copied to clipboard!';
                             }
+                            renderContributionSummary(requestHash, contributorNames, typeName, hoursInput.value, minutesInput.value, amount, description, tdgValues, contributionLocation, fileName);
                         }
                     } else {
                         if (await copyToClipboard(shareText)) {
                             output.innerHTML = `Internet is not available. Report copied to clipboard. Please paste it into our <a href="${telegramLink}" target="_blank">Telegram</a> or <a href="${whatsappLink}" target="_blank">WhatsApp</a> channels.`;
                             output.className = 'error';
+                            renderContributionSummary(requestHash, contributorNames, typeName, hoursInput.value, minutesInput.value, amount, description, tdgValues, contributionLocation, fileName);
                         } else {
                             output.innerHTML = `Internet is not available and clipboard copy failed. Please manually copy the report below and share it to our <a href="${telegramLink}" target="_blank">Telegram</a> or <a href="${whatsappLink}" target="_blank">WhatsApp</a> channels:<br><br><pre>${shareText}</pre>`;
                             output.className = 'error';
+                            renderContributionSummary(requestHash, contributorNames, typeName, hoursInput.value, minutesInput.value, amount, description, tdgValues, contributionLocation, fileName);
                         }
                     }
                 }
