@@ -22,6 +22,7 @@
     <script src="./routes.js"></script>
     <script src="./menu.js?v=20260512e"></script>
     <script src="./tdg_balance.js"></script>
+    <script src="./scripts/dao_members_cache.js"></script>
 
     <style>
         body {
@@ -1934,19 +1935,27 @@
                 return;
             }
 
-            var controller = new AbortController();
-            var to = setTimeout(function () { controller.abort(); }, 10000);
-            var response = await fetch(SIGNATURE_VERIFY_API + '?signature=' + encodeURIComponent(publicKey), {
-                signal: controller.signal,
-                cache: 'no-store'
-            });
-            clearTimeout(to);
+            var data;
+            // Cache-first identity lookup — dao_members.json from GitHub CDN
+            // (~50–150ms) vs the assetVerify GAS round-trip (1–5s cold-start).
+            try {
+                var lookup = await window.DaoMembersCache.findByPublicKey(publicKey);
+                if (lookup.contributor) {
+                    data = { contributor_name: lookup.contributor.name };
+                }
+            } catch (_) { /* cache unavailable; fall through to GAS */ }
 
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
+            if (!data) {
+                var controller = new AbortController();
+                var to = setTimeout(function () { controller.abort(); }, 10000);
+                var response = await fetch(SIGNATURE_VERIFY_API + '?signature=' + encodeURIComponent(publicKey), {
+                    signal: controller.signal,
+                    cache: 'no-store'
+                });
+                clearTimeout(to);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                data = await response.json();
             }
-
-            var data = await response.json();
 
             if (data.error) {
                 var err = String(data.error || '');
