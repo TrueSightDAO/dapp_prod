@@ -47,6 +47,7 @@
     <script src="./routes.js"></script>
     <script src="./menu.js?v=20260512e"></script>
     <script src="./tdg_balance.js"></script>
+    <script src="./scripts/dao_members_cache.js"></script>
     
     <!-- Leaflet.js for maps (no API key required) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -3649,21 +3650,27 @@
             }
 
             try {
-                // Add timeout to fetch request
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-                
-                const response = await fetch(`${SIGNATURE_VERIFY_API}?signature=${encodeURIComponent(publicKey)}`, {
-                    signal: controller.signal,
-                    cache: 'no-store'
-                });
-                clearTimeout(timeoutId);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                let data;
+                // Cache-first identity lookup — dao_members.json from GitHub CDN
+                // (~50–150ms) vs the assetVerify GAS round-trip (1–5s cold-start).
+                try {
+                    const lookup = await window.DaoMembersCache.findByPublicKey(publicKey);
+                    if (lookup.contributor) {
+                        data = { contributor_name: lookup.contributor.name };
+                    }
+                } catch (_) { /* cache unavailable; fall through to GAS */ }
+
+                if (!data) {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    const response = await fetch(`${SIGNATURE_VERIFY_API}?signature=${encodeURIComponent(publicKey)}`, {
+                        signal: controller.signal,
+                        cache: 'no-store'
+                    });
+                    clearTimeout(timeoutId);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    data = await response.json();
                 }
-                
-                const data = await response.json();
 
                 if (data.error) {
                     if (data.error.includes('No matching')) {
