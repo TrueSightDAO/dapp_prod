@@ -99,8 +99,8 @@
     return { status: 'success', data: { currencies: currencies, total_currencies: currencies.length } };
   }
 
-  // [{currency, amount, unit_cost?, total_value?, ledger?}] — drop-in for
-  // DAO_FORMS_BASE?manager=<key> (report_inventory_movement, report_dao_expenses).
+  // [{currency, amount, unit_cost?, total_value?, ledger?, gtin?, hs_code?}]
+  // gtin and hs_code are available from schema v4+ (Currencies columns R and S).
   async function getManagerAssets(managerKey) {
     var snap = await load();
     if (!snap) return null;
@@ -111,6 +111,8 @@
       if (itm.unit_cost_usd != null) out.unit_cost = itm.unit_cost_usd;
       if (itm.total_value_usd != null) out.total_value = itm.total_value_usd;
       if (itm.ledger) out.ledger = itm.ledger;
+      if (itm.gtin) out.gtin = itm.gtin;
+      if (itm.hs_code) out.hs_code = itm.hs_code;
       return out;
     });
   }
@@ -133,13 +135,16 @@
     }
     var inventory = manager
       ? manager.items.map(function (itm) {
-          return {
+          var entry = {
             currency: itm.currency,
             amount: itm.amount,
             ledger_name: itm.ledger || '',
             weight_grams: itm.unit_weight_g != null ? itm.unit_weight_g : null,
             has_weight: itm.unit_weight_g != null
           };
+          if (itm.gtin) entry.gtin = itm.gtin;
+          if (itm.hs_code) entry.hs_code = itm.hs_code;
+          return entry;
         })
       : [];
     return { status: 'success', data: { inventory: inventory } };
