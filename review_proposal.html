@@ -16,7 +16,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="https://github.com/TrueSightDAO/.github/blob/main/assets/20240612_truesight_dao_logo_square.png?raw=true">
     <script src="./routes.js"></script>
-    <script src="./menu.js?v=20260603a"></script>
+    <script src="./menu.js?v=20260628a"></script>
     <script src="./tdg_balance.js"></script>
     <style>
         * {
@@ -987,21 +987,21 @@ Verify submission here: https://dapp.truesight.me/verify_request.html`;
                     `;
                     content.appendChild(successDiv);
                 } else {
-                    // Show inline error that preserves proposal content
-                    const content = document.getElementById('content');
+                    // Show inline error above the voting section
+                    const votingSection = document.getElementById('voting-section');
                     const errorBanner = document.createElement('div');
                     errorBanner.style.cssText = 'background:#f8d7da;color:#721c24;padding:12px 16px;border-radius:6px;border-left:4px solid #dc3545;margin:0 0 20px 0;font-weight:500;';
                     errorBanner.textContent = `Failed to submit vote: ${result.error || 'Unknown error'}`;
-                    content.insertBefore(errorBanner, content.firstChild);
+                    votingSection.insertBefore(errorBanner, votingSection.firstChild);
                     setTimeout(() => { if (errorBanner.parentNode) errorBanner.parentNode.removeChild(errorBanner); }, 10000);
                 }
             } catch (error) {
                 console.error('Error submitting vote:', error);
-                const content = document.getElementById('content');
+                const votingSection = document.getElementById('voting-section');
                 const errorBanner = document.createElement('div');
                 errorBanner.style.cssText = 'background:#f8d7da;color:#721c24;padding:12px 16px;border-radius:6px;border-left:4px solid #dc3545;margin:0 0 20px 0;font-weight:500;';
                 errorBanner.textContent = 'Failed to submit vote. Please try again.';
-                content.insertBefore(errorBanner, content.firstChild);
+                votingSection.insertBefore(errorBanner, votingSection.firstChild);
                 setTimeout(() => { if (errorBanner.parentNode) errorBanner.parentNode.removeChild(errorBanner); }, 10000);
             }
         }
