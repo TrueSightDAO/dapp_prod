@@ -956,7 +956,7 @@ Verify submission here: https://dapp.truesight.me/verify_request.html`;
 
                 const result = await response.json();
 
-                if (result.status === 'success') {
+                if (result.status === 'success' || result.status === 'ok') {
                     // §9b — surface signed payload + Edgar's response.
                     document.getElementById('requestPre').textContent = shareText;
                     document.getElementById('responsePre').textContent = JSON.stringify(result, null, 2);
