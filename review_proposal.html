@@ -987,11 +987,22 @@ Verify submission here: https://dapp.truesight.me/verify_request.html`;
                     `;
                     content.appendChild(successDiv);
                 } else {
-                    showError(`Failed to submit vote: ${result.error || 'Unknown error'}`);
+                    // Show inline error that preserves proposal content
+                    const content = document.getElementById('content');
+                    const errorBanner = document.createElement('div');
+                    errorBanner.style.cssText = 'background:#f8d7da;color:#721c24;padding:12px 16px;border-radius:6px;border-left:4px solid #dc3545;margin:0 0 20px 0;font-weight:500;';
+                    errorBanner.textContent = `Failed to submit vote: ${result.error || 'Unknown error'}`;
+                    content.insertBefore(errorBanner, content.firstChild);
+                    setTimeout(() => { if (errorBanner.parentNode) errorBanner.parentNode.removeChild(errorBanner); }, 10000);
                 }
             } catch (error) {
                 console.error('Error submitting vote:', error);
-                showError('Failed to submit vote. Please try again.');
+                const content = document.getElementById('content');
+                const errorBanner = document.createElement('div');
+                errorBanner.style.cssText = 'background:#f8d7da;color:#721c24;padding:12px 16px;border-radius:6px;border-left:4px solid #dc3545;margin:0 0 20px 0;font-weight:500;';
+                errorBanner.textContent = 'Failed to submit vote. Please try again.';
+                content.insertBefore(errorBanner, content.firstChild);
+                setTimeout(() => { if (errorBanner.parentNode) errorBanner.parentNode.removeChild(errorBanner); }, 10000);
             }
         }
 
