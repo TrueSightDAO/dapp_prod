@@ -19,8 +19,10 @@
     <script src="./menu.js?v=20260702c"></script>
     <script src="./tdg_balance.js"></script>
     <script src="./scripts/dao_members_cache.js"></script>
+    <script src="./scripts/edgar_submission.js?v=20260913a"></script>
     <script src="./scripts/currencies_cache.js?v=20260912a"></script>
     <script src="./scripts/dapp_combobox.js"></script>
+    <script src="./asset-receipt-form-utils.js?v=20260912a"></script>
 
     <style>
         body {
@@ -532,7 +534,19 @@
             const amount = document.getElementById('amountInput').value;
             const description = document.getElementById('descriptionInput').value.trim();
             
-            const isValid = fundHandler && currency && amount && parseFloat(amount) > 0 && description;
+            // Post-submission the button is a reset control ("Submit another one"),
+            // so it must stay clickable regardless of field state.
+            if (isPostSubmission) {
+                submitBtn.disabled = false;
+                return;
+            }
+
+            const isValid = window.assetReceiptFormUtils.isFormValid({
+                fundHandler: fundHandler,
+                currency: currency,
+                amount: amount,
+                description: description
+            });
             
             submitBtn.disabled = !isValid;
         }
@@ -581,20 +595,21 @@
                 const shareText = `${requestText}\n\nMy Digital Signature: ${publicKey}\n\nRequest Transaction ID: ${requestHash}\n\nThis submission was generated using ${window.location.href}\n\nVerify submission here: https://dapp.truesight.me/verify_request.html`;
 
                 if (await isOnline()) {
-                    const formData = new FormData();
-                    formData.append('text', shareText);
-                    if (file) {
-                        formData.append('attachment', file, fileName);
-                    }
-
-                    const resp = await fetch(EDGAR_SUBMIT, {
-                        method: 'POST',
-                        body: formData
+                    // iOS WebKit intermittently sends fetch()+FormData POSTs with an
+                    // empty body when the attachment is a camera file, which Edgar
+                    // records as an unverified "[No Text Provided]" row. Post via
+                    // XMLHttpRequest with the attachment materialised in memory, and
+                    // retry until Edgar confirms a verified signature.
+                    const sendableFile = await EdgarSubmission.toSendableBlob(file);
+                    const submission = await EdgarSubmission.submitWithRetry({
+                        url: EDGAR_SUBMIT,
+                        text: shareText,
+                        file: sendableFile,
+                        fileName: fileName,
+                        attempts: 3
                     });
 
-                    if (!resp.ok) throw new Error(await resp.text());
-
-                    const result = await resp.json();
+                    const result = submission.result;
 
                     // Make file location clickable after successful upload
                     if (result.fileUploadedToGithub && file) {
@@ -610,6 +625,7 @@
                     document.getElementById('submissionResult').style.display = 'block';
                     output.className = 'status';
                     isPostSubmission = true;
+                    updateButtonText();
                 } else {
                     if (isMobileDevice()) {
                         if (navigator.share) {
@@ -640,6 +656,61 @@
             } finally {
                 submitBtn.disabled = false;
             }
+        }
+
+        // After a successful submission the submit button flips to
+        // "Submit another one"; clicking it clears the form instead of re-submitting.
+        function updateButtonText() {
+            const submitBtn = document.getElementById('submitButton');
+            submitBtn.textContent = window.assetReceiptFormUtils.buttonLabel(isPostSubmission);
+            submitBtn.setAttribute('aria-label', submitBtn.textContent);
+        }
+
+        function resetForm() {
+            // Text fields back to their cleared defaults (amount -> markup value="1")
+            const empty = window.assetReceiptFormUtils.emptyFormState();
+            document.getElementById('fundHandlerInput').value = empty.fundHandler;
+            document.getElementById('currencyInput').value = empty.currency;
+            document.getElementById('amountInput').value = empty.amount;
+            document.getElementById('descriptionInput').value = empty.description;
+            updateCharCount();
+
+            // Attached file state + preview
+            file = null;
+            fileName = '';
+            cachedAssetReceiptFileName = null;
+            const preview = document.getElementById('uploaded-file-preview');
+            if (preview) {
+                preview.style.display = 'none';
+                preview.src = '';
+            }
+            updateFileInfo();
+
+            // Signed payload / Edgar response panel
+            const submissionResult = document.getElementById('submissionResult');
+            if (submissionResult) submissionResult.style.display = 'none';
+            document.getElementById('requestPre').textContent = '';
+            document.getElementById('responsePre').textContent = '';
+
+            // Preview
+            updateEventPreview();
+        }
+
+        function onSubmitClick() {
+            if (isPostSubmission) {
+                resetForm();
+                isPostSubmission = false;
+                updateButtonText();
+                // Re-evaluate AFTER clearing the flag so the empty form correctly
+                // disables the (now relabelled) submit button.
+                updateSubmitButtonState();
+                const output = document.getElementById('outputMessage');
+                output.textContent = 'Form cleared. Please fill in the details for the new asset receipt report.';
+                output.className = 'status';
+                output.classList.remove('hidden');
+                return;
+            }
+            submitReport();
         }
 
         // Event listeners
@@ -688,7 +759,8 @@
                 updateEventPreview();
                 updateSubmitButtonState();
             });
-            document.getElementById('submitButton').addEventListener('click', submitReport);
+            document.getElementById('submitButton').addEventListener('click', onSubmitClick);
+            updateButtonText();
 
             // File upload event listeners
             document.getElementById('paste-area').addEventListener('click', triggerFileSelect);

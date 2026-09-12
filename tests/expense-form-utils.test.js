@@ -9,8 +9,26 @@ const {
     normalizeLedgerName,
     buildSubmitPayload,
     validateDescription,
-    generateExpenseFileName
+    normalizeDescription,
+    generateExpenseFileName,
+    extractClipboardFile,
+    hasAttachableFile,
+    PASSTHROUGH_MIME_TYPES
 } = require('../expense-form-utils.js');
+
+// Minimal stand-ins for the browser objects the extractor touches.
+function fakeFile(name, type) {
+    return { name, type };
+}
+function clipboard({ files = [], items = [] }) {
+    return { files, items };
+}
+function fileItem(file) {
+    return { kind: 'file', getAsFile: () => file };
+}
+function stringItem(str) {
+    return { kind: 'string', getAsString: () => str };
+}
 
 function test(name, fn) {
     try {
@@ -87,9 +105,10 @@ passed += test('raw USD, ledger offchain → USD, offchain', () => {
 // validateDescription
 console.log('\nvalidateDescription:');
 passed += test('valid description', () => assert.strictEqual(validateDescription('Office supplies'), true));
-passed += test('rejects newline', () => assert.strictEqual(validateDescription('Line1\nLine2'), false));
-passed += test('rejects carriage return', () => assert.strictEqual(validateDescription('Line1\rLine2'), false));
+passed += test('accepts newline (multiline now allowed)', () => assert.strictEqual(validateDescription('Line1\nLine2'), true));
+passed += test('accepts carriage return (multiline now allowed)', () => assert.strictEqual(validateDescription('Line1\rLine2'), true));
 passed += test('empty → false', () => assert.strictEqual(validateDescription(''), false));
+passed += test('whitespace-only → false', () => assert.strictEqual(validateDescription('   \n  '), false));
 
 // generateExpenseFileName
 console.log('\ngenerateExpenseFileName:');
@@ -101,6 +120,63 @@ passed += test('sanitizes special chars', () => {
     const f = generateExpenseFileName('file (1).pdf', 'Test User');
     assert.ok(!f.includes(' ') && !f.includes('(') && !f.includes(')'));
 });
+
+// extractClipboardFile
+console.log('\nextractClipboardFile:');
+passed += test('prefers .files when present', () => {
+    const f = fakeFile('a.png', 'image/png');
+    assert.strictEqual(extractClipboardFile(clipboard({ files: [f] })), f);
+});
+passed += test('falls back to .items kind=file (mobile Safari behaviour)', () => {
+    const f = fakeFile('b.png', 'image/png');
+    assert.strictEqual(extractClipboardFile(clipboard({ items: [fileItem(f)] })), f);
+});
+passed += test('skips string items and finds the file among them', () => {
+    const f = fakeFile('c.pdf', 'application/pdf');
+    const cd = clipboard({ items: [stringItem('hello'), fileItem(f)] });
+    assert.strictEqual(extractClipboardFile(cd), f);
+});
+passed += test('null clipboardData -> null', () =>
+    assert.strictEqual(extractClipboardFile(null), null));
+passed += test('undefined clipboardData -> null', () =>
+    assert.strictEqual(extractClipboardFile(undefined), null));
+passed += test('plain text clipboard -> null (no file to attach)', () =>
+    assert.strictEqual(extractClipboardFile(clipboard({ items: [stringItem('just text')] })), null));
+passed += test('empty clipboard -> null', () =>
+    assert.strictEqual(extractClipboardFile(clipboard({})), null));
+passed += test('item whose getAsFile() returns null -> null', () =>
+    assert.strictEqual(extractClipboardFile(clipboard({ items: [{ kind: 'file', getAsFile: () => null }] })), null));
+
+// hasAttachableFile
+console.log('\nhasAttachableFile:');
+passed += test('png is attachable', () =>
+    assert.strictEqual(hasAttachableFile(clipboard({ files: [fakeFile('a.png', 'image/png')] })), true));
+passed += test('pdf is attachable', () =>
+    assert.strictEqual(hasAttachableFile(clipboard({ files: [fakeFile('a.pdf', 'application/pdf')] })), true));
+passed += test('gif is attachable', () =>
+    assert.strictEqual(hasAttachableFile(clipboard({ files: [fakeFile('a.gif', 'image/gif')] })), true));
+passed += test('text/plain file is NOT attachable', () =>
+    assert.strictEqual(hasAttachableFile(clipboard({ files: [fakeFile('a.txt', 'text/plain')] })), false));
+passed += test('no file -> false', () =>
+    assert.strictEqual(hasAttachableFile(clipboard({})), false));
+passed += test('accepts an explicit allowedTypes override', () =>
+    assert.strictEqual(hasAttachableFile(clipboard({ files: [fakeFile('a.txt', 'text/plain')] }), ['text/plain']), true));
+
+// PASSTHROUGH_MIME_TYPES
+console.log('\nPASSTHROUGH_MIME_TYPES:');
+passed += test('is the four types the expense form accepts', () =>
+    assert.deepStrictEqual(PASSTHROUGH_MIME_TYPES, ['image/png', 'image/jpeg', 'image/gif', 'application/pdf']));
+
+// normalizeDescription
+console.log('\nnormalizeDescription:');
+passed += test('single line unchanged', () => assert.strictEqual(normalizeDescription('Office supplies'), 'Office supplies'));
+passed += test('joins logical lines with a pipe', () => assert.strictEqual(normalizeDescription('Line1\nLine2'), 'Line1 | Line2'));
+passed += test('CRLF normalised', () => assert.strictEqual(normalizeDescription('A\r\nB'), 'A | B'));
+passed += test('blank lines dropped', () => assert.strictEqual(normalizeDescription('A\n\n\nB'), 'A | B'));
+passed += test('no leading newline before the next field marker', () => assert.ok(!/\n/.test(normalizeDescription('A\n- not a new field'))));
+passed += test('line starting with dash stays inline', () => assert.strictEqual(normalizeDescription('A\n- B'), 'A | - B'));
+passed += test('trims surrounding whitespace', () => assert.strictEqual(normalizeDescription('  A  \n  B  '), 'A | B'));
+passed += test('null -> empty', () => assert.strictEqual(normalizeDescription(null), ''));
 
 console.log('\n---');
 console.log(`Passed: ${passed}, Failed: ${failed}`);
