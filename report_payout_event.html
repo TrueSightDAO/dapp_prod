@@ -14,6 +14,7 @@
 
     <link rel="icon" type="image/png" href="https://github.com/TrueSightDAO/.github/blob/main/assets/20240612_truesight_dao_logo_square.png?raw=true">
 
+    <script>window.ROUTES_NO_PROBE = true; /* pin out of the routes.js auto-flip: this page's recipient autofill (getTreeRecipientMap) must never be aborted by a mid-session reload, and the Edgar proxy does not serve payoutRegistrations (404). */</script>
     <script src="./routes.js"></script>
     <script src="./menu.js?v=20260914a"></script>
     <script src="./tdg_balance.js"></script>
@@ -21,7 +22,7 @@
     <script src="./scripts/permissions.js"></script>
     <script src="./scripts/edgar_payload_helper.js"></script>
     <script src="./scripts/edgar_submission.js?v=20260913a"></script>
-    <script src="./payout-event-utils.js"></script>
+    <script src="./payout-event-utils.js?v=20260926c"></script>
 
     <style>
         /* TrueSight DApp — light "Saffron Monk" / earthen palette, matching link_tree_planting.html */
@@ -81,6 +82,58 @@
         input, select { margin-bottom: 0.8rem; width: 100%; padding: 0.5rem; border-radius: 5px; border: 1px solid #ddd; font-size: 0.95rem; box-sizing: border-box; }
         input.invalid, select.invalid { border-color: var(--red); background-color: #fff0f0; }
         .hint { font-size: 0.8rem; color: #777; margin: -0.5rem 0 0.8rem; }
+        .overpay-guard { margin: 0.2rem 0 0.8rem; }
+        .overpay-summary { font-size: 0.8rem; color: #555; margin-bottom: 0.3rem; }
+        .overpay-row {
+            font-size: 0.82rem; background: var(--yellow-bg); border: 1px solid #e6d79a;
+            border-radius: 6px; padding: 0.4rem 0.6rem; margin: 0.25rem 0; color: #6b5408; line-height: 1.45;
+        }
+        .overpay-row code { background: #fff; padding: 0 0.2rem; border-radius: 3px; }
+        .overpay-reason { margin: 0.25rem 0 0; }
+        .overpay-all { font-size: 0.8rem; margin-top: 0.3rem; }
+        .overpay-all-list { margin-top: 0.3rem; display: flex; flex-direction: column; gap: 0.15rem; }
+        .overpay-all-list code { background: #f2f2f2; padding: 0.05rem 0.25rem; border-radius: 3px; }
+        .overpay-legend { font-size: 0.75rem; color: #777; margin-top: 0.25rem; line-height: 1.45; }
+        .overpay-all-row { display: block; width: 100%; font-size: 0.8rem; color: #555; line-height: 1.7; }
+        .overpay-all-row.is-selected { background: var(--yellow-bg); border-radius: 4px; padding: 0 0.3rem; }
+        .flagged-pick { background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: #1a4d8f; }
+        .flagged-pick:hover code, .flagged-pick:focus code { background: #e8f0fb; text-decoration: underline; }
+        .tree-details { margin: 0.2rem 0 0.9rem; }
+        .tree-card { border: 1px solid #d7d7d7; border-radius: 8px; background: #fbfbfb; padding: 0.6rem 0.7rem; margin: 0.35rem 0; display: flex; gap: 0.7rem; }
+        .tree-card img.tc-photo { width: 128px; height: 128px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; flex: 0 0 auto; background: #eee; }
+        .tree-card .tc-main { flex: 1; min-width: 0; }
+        .tree-card .tc-id { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.85rem; color: #111; word-break: break-all; }
+        .tree-card .tc-meta { font-size: 0.78rem; color: #666; margin-top: 0.15rem; line-height: 1.5; }
+        .tree-card .tc-pk { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.8rem; margin-top: 0.2rem; }
+        .tree-card .tc-masked { display: block; margin-top: 0.15rem; font-size: 0.76rem; color: #7a5c00; font-weight: 600; }
+        .tree-card .tc-none { font-size: 0.78rem; color: #8a6d3b; margin-top: 0.2rem; }
+        .tree-card .tc-payee { margin-top: 0.3rem; font-size: 0.78rem; }
+        .tree-card a.tc-copy { color: #1a4d8f; cursor: pointer; text-decoration: none; border-bottom: 1px dotted #1a4d8f; }
+        .tree-card a.tc-copy:hover { background: #e8f0fb; }
+        .tree-card a.tc-copy.is-copied { color: #1e6b34; border-bottom-color: #1e6b34; }
+        .tree-card .tc-payee-url { display: block; margin-top: 0.15rem; font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.72rem; color: #666; word-break: break-all; }
+        .cards-compare { display: flex; gap: 0.9rem; align-items: flex-start; flex-wrap: wrap; margin: 0.25rem 0 0.2rem; }
+        .cards-compare .compare-col { flex: 1 1 320px; min-width: 280px; }
+        .cards-compare .compare-heading { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; color: #555; font-weight: 700; margin-bottom: 0.15rem; }
+        .cards-compare .compare-heading .hint-inline { text-transform: none; letter-spacing: 0; font-weight: 400; color: #999; font-size: 0.72rem; }
+        .cards-compare .compare-empty { font-size: 0.78rem; color: #999; font-style: italic; padding: 0.5rem 0.2rem; }
+        .cards-compare .compare-clear { font-size: 0.8rem; color: #1e6b34; background: #e6f4ea; border: 1px solid #b7dfc4;
+            border-radius: 6px; padding: 0.5rem 0.6rem; line-height: 1.5; }
+        .primary-tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+            background: var(--accent); color: #fff; border-radius: 10px; padding: 0.1rem 0.45rem; margin-left: 0.4rem; vertical-align: middle; }
+        .opt-tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+            background: #e9e9e9; color: #666; border-radius: 10px; padding: 0.1rem 0.45rem; margin-left: 0.4rem; vertical-align: middle; }
+        .sub-label { font-size: 0.85rem; color: #666; margin-top: 0.2rem; }
+        .paste-area {
+            border: 2px dashed #ccc; padding: 0.9rem; text-align: center; margin: 0.4rem 0 0.6rem;
+            border-radius: 6px; cursor: pointer; background: #f8f9fa; font-size: 0.95rem; color: #333;
+        }
+        .paste-area:hover { background: #e9ecef; }
+        .paste-area.has-file { border-style: solid; border-color: #2e7d32; background: #f1f8f2; }
+        .info-location { font-size: 0.82rem; color: #666; word-break: break-all; margin-bottom: 0.6rem; }
+        #receipt-file-preview { max-width: 100%; height: auto; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 0.6rem; }
+        #treePicker { margin-bottom: 0.4rem; }
         .row2 { display: flex; gap: 0.75rem; }
         .row2 > div { flex: 1; }
         button {
@@ -90,6 +143,10 @@
         button:hover { background-color: var(--accent-hover); }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         .button-container { display: flex; flex-direction: column; align-items: center; }
+        .invalid-zone { align-items: center; gap: 0.6rem; margin: 0.5rem 0 0.25rem; flex-wrap: wrap; }
+        button.danger { background: #b02a37; }
+        button.danger:hover { background: #8f2029; }
+        .invalid-zone .hint { margin: 0; }
         #status { margin: 1rem 0; font-weight: bold; min-height: 24px; font-size: 1rem; text-align: center; }
         #status.success, .status { color: var(--green); }
         #status.error, .error { color: var(--red); }
@@ -102,6 +159,35 @@
             font-size: 0.82rem; line-height: 1.4; white-space: pre-wrap;
             word-break: break-word; max-height: 360px; overflow: auto;
         }
+        .recipients-panel { border: 1px solid #d7d7d7; border-radius: 8px; background: #fbfbfb; padding: 0.8rem 0.9rem; margin: 0.6rem 0 1rem; }
+        .recipients-panel h3 { margin: 0 0 0.3rem; font-size: 0.95rem; color: #333; }
+        .recipients-panel .rp-sub { font-size: 0.78rem; color: #777; margin-bottom: 0.5rem; line-height: 1.4; }
+        .recipient-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; border: 1px solid #e4e4e4; background: #fff; margin: 0.25rem 0; }
+        .recipient-row .rp-main { flex: 1; min-width: 0; }
+        .recipient-row .rp-pk { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.85rem; color: #111; word-break: break-all; }
+        .recipient-row .rp-meta { font-size: 0.75rem; color: #666; margin-top: 0.1rem; }
+        .recipient-row .rp-status { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 10px; padding: 0.1rem 0.45rem; background: #eee; color: #555; white-space: nowrap; }
+        .recipient-row .rp-status.active { background: var(--green-bg); color: var(--green); }
+        .recipient-row button.rp-use { width: auto; max-width: none; margin: 0; padding: 0.35rem 0.7rem; font-size: 0.8rem; border-radius: 6px; background: var(--accent); }
+        .recipient-row button.rp-use:hover { background: var(--accent-hover); }
+
+        .batch-toggle { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.2rem; font-weight: bold; }
+        .batch-toggle input[type=checkbox] { width: auto; margin: 0; flex: 0 0 auto; }
+        .batch-panel { border: 1px solid #d7d7d7; border-radius: 8px; background: #fbfbfb; padding: 0.8rem 0.9rem; margin: 0.5rem 0 1rem; }
+        .batch-panel h3 { margin: 0 0 0.3rem; font-size: 0.95rem; color: #333; }
+        .batch-panel .bp-sub { font-size: 0.78rem; color: #777; margin-bottom: 0.5rem; line-height: 1.4; }
+        .batch-list { max-height: 240px; overflow: auto; border: 1px solid #e4e4e4; border-radius: 6px; background: #fff; padding: 0.3rem; }
+        .batch-list label { display: flex; align-items: center; gap: 0.5rem; padding: 0.28rem 0.4rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+        .batch-list label:hover { background: #f4f6f8; }
+        .batch-list input[type=checkbox] { width: auto; margin: 0; flex: 0 0 auto; }
+        .batch-actions { display: flex; gap: 0.5rem; align-items: center; margin: 0.45rem 0 0; flex-wrap: wrap; }
+        .batch-actions button { width: auto; max-width: 220px; margin: 0; padding: 0.35rem 0.7rem; font-size: 0.8rem; border-radius: 6px; }
+        .batch-actions .bp-count { font-size: 0.82rem; color: #555; font-weight: bold; }
+        #batchSplitNote { font-size: 0.82rem; color: #555; margin-top: 0.35rem; }
+        .batch-summary { margin: 0.5rem 0; font-size: 0.85rem; text-align: left; }
+        .batch-summary .bs-ok { color: var(--green); }
+        .batch-summary .bs-fail { color: var(--red); }
+        .batch-summary ul { margin: 0.2rem 0 0.4rem; padding-left: 1.1rem; }
     </style>
 </head>
 <body>
@@ -120,20 +206,70 @@
         <p id="description">
             Governor-only. Record an <strong>outbound compensation transfer</strong> (e.g. a PIX payment
             for tree planting) as a signed <code>[PAYOUT EVENT]</code>. One row per <em>transfer</em> —
-            a single payment may cover several trees.
+            pick the tree the transfer covers.
         </p>
 
         <div class="privacy-note">
             <strong>The raw recipient PIX key never travels here.</strong> This page submits to Edgar,
-            whose intake is republished as a <em>public</em> chatlog. Attach a recipient by name and,
-            if known, a non-reversible <code>recipient_pk_hash</code> &mdash; the private key stays in the
-            restricted payout register.
+            whose intake is republished as a <em>public</em> chatlog. The <strong>tree id is the primary
+            field</strong> &mdash; picking a tree attaches its recipient automatically. If a recipient is known,
+            a non-reversible <code>recipient_pk_hash</code> links the payout &mdash; the
+            private key stays in the restricted payout register.
         </div>
 
         <div class="input-group">
             <label for="programSlug">Program</label>
-            <input type="text" id="programSlug" value="crf-anapu" placeholder="e.g. crf-anapu" autocomplete="off" required>
-            <div class="hint">The program this payout belongs to (payouts are a Sunmint-tree-planting capability; CFR Anapu is the first executor).</div>
+            <select id="programSlug">
+                <option value="">(no program &mdash; general disbursement)</option>
+                <option value="crf-anapu" selected>crf-anapu</option>
+            </select>
+            <div class="hint">The program this payout belongs to. Pick one to narrow the unpaid-tree list below to that program&rsquo;s trees; leave it as <em>no program</em> for a general disbursement (the emitted <code>Program</code> is then <code>unlinked_program</code> and the CFR-only Tier-2 write does not fire).</div>
+            <div id="programFilterNote" class="hint" style="display:none;"></div>
+
+            <label for="farmFilter">Farm</label>
+            <select id="farmFilter">
+                <option value="">(all farms)</option>
+            </select>
+            <label for="plotFilter">Plot</label>
+            <select id="plotFilter" disabled>
+                <option value="">(all plots)</option>
+            </select>
+            <div class="hint">Narrow the unpaid-tree list by <strong>farm</strong> and <strong>plot</strong>, alongside the Program filter &mdash; all facets apply together (AND). A tree's farm/plot is derived by a point-in-polygon join of its GPS coordinates against the registered plot boundaries, so a tree with no usable coordinates or an unregistered location matches no farm (it is hidden once you pick one). Plot options cascade from the chosen farm.</div>
+            <div id="farmPlotFilterNote" class="hint" style="display:none;"></div>
+
+            <label for="treePicker">Tree Planting ID <span class="primary-tag">primary</span></label>
+            <select id="treePicker">
+                <option value="">Loading unpaid trees&hellip;</option>
+            </select>
+            <div class="hint">Pick one <strong>unpaid</strong> tree &mdash; identified by its signed <code>Request Transaction ID</code> (<code>tx:&hellip;</code>, the canonical key; older rows without a txid fall back to the <code>Edgar_&hellip;</code> transport id). Only one tree is selected at a time &mdash; leave it blank for a general disbursement.</div>
+            <label class="batch-toggle"><input type="checkbox" id="batchMode"> Backfill a cluster &mdash; one transfer covering several trees</label>
+            <div class="batch-panel" id="batchPanel" style="display:none;">
+                <h3>Batch backfill <span class="opt-tag">cluster of trees</span></h3>
+                <div class="bp-sub">Tick every tree this <strong>one</strong> transfer covers, then enter the transfer&rsquo;s <strong>total</strong> in the Amount field below. The page fires <strong>one <code>[PAYOUT EVENT]</code> per tree</strong>, each carrying its even share (total &divide; N). The sink discharges one <code>Cacao Tree - To Be Paid For</code> unit per event &mdash; so this is the only shape that clears <em>every</em> tree (a single multi-tree event would silently under-book N&minus;1).</div>
+                <div id="batchList" class="batch-list"></div>
+                <div class="batch-actions">
+                    <button type="button" id="batchSelectAll">Select all filtered</button>
+                    <button type="button" id="batchClearAll">Clear</button>
+                    <span id="batchCount" class="bp-count">0 selected</span>
+                </div>
+                <div id="batchSplitNote"></div>
+            </div>
+            <div class="cards-compare">
+                <div class="compare-col">
+                    <div class="compare-heading">Tree Details <span class="hint-inline">&mdash; from the picker above</span></div>
+                    <div id="treeDetails" class="tree-details"></div>
+                </div>
+                <div class="compare-col">
+                    <div class="compare-heading">Overpay Conflict <span class="hint-inline">&mdash; the tree it collides with</span></div>
+                    <div id="overpayReason" class="overpay-reason"></div>
+                    <div id="overpayTreeDetails" class="tree-details"></div>
+                </div>
+            </div>
+            <div id="invalidZone" class="invalid-zone" style="display:none;">
+                <button id="markInvalidButton" type="button" class="danger">Mark tree as invalid</button>
+                <span class="hint">Marks this SunMint submission INVALID (governor/sentinel only).</span>
+            </div>
+            <div id="overpayGuard" class="overpay-guard"></div>
 
             <div class="row2">
                 <div>
@@ -170,32 +306,37 @@
             </div>
             <div class="hint">The transfer's end-to-end id from the bank statement &mdash; the reconciliation anchor.</div>
 
-            <label for="recipientName">Recipient</label>
-            <input type="text" id="recipientName" placeholder="e.g. Paulo (La do S&iacute;tio)" autocomplete="off" required>
-
             <label for="recipientPkHash">Recipient PK Hash</label>
             <input type="text" id="recipientPkHash" placeholder="Leave blank if not yet registered" autocomplete="off">
             <div class="hint">From the private payout register. If blank, the payout is recorded as <code>unlinked_recipient</code> and can be linked later.</div>
+            <div id="recipientLookupStatus" class="hint"></div>
 
-            <label for="treeIds">Tree Planting IDs</label>
-            <input type="text" id="treeIds" placeholder="e.g. 20260907_CEPO_1, 20260907_CEPO_2" autocomplete="off">
-            <div class="hint">Comma- or space-separated. Cover N trees in one row. Leave blank for a general disbursement.</div>
+            <div id="recipientsPanel" class="recipients-panel" style="display:none;">
+                <h3>Registered recipients <span class="opt-tag">from the private register</span></h3>
+                <div class="rp-sub">One row per <code>pk_hash</code> (an ACTIVE row wins, else the most recent). Click <strong>Use</strong> to fill the recipient field &mdash; the raw PIX key is never shown here.</div>
+                <div id="recipientsList"></div>
+                <div id="recipientsStatus" class="hint"></div>
+            </div>
 
-            <label for="payoutStatus">Status</label>
-            <select id="payoutStatus">
-                <option value="live">live &mdash; captured as it happened</option>
-                <option value="backfill">backfill &mdash; reconstructed after the fact</option>
-            </select>
+            <div class="hint">Status is set automatically from <strong>Paid At</strong>: <code>backfill</code> when it is before today, otherwise <code>live</code> &mdash; no need to pick it.</div>
 
-            <label for="receiptUrl">Receipt URL</label>
-            <input type="text" id="receiptUrl" placeholder="Optional link to the transfer receipt" autocomplete="off">
+            <label for="receiptPasteArea">Receipt (attachment)</label>
+            <div class="hint">Optional. Attach the bank-transfer receipt (image or PDF). It is uploaded to the <strong>private</strong> <code>TrueSightDAO/payout-receipts-raw</code> repo &mdash; never a public one.</div>
+            <div id="receiptPasteArea" class="paste-area" tabindex="0">Click to select or paste (Ctrl+V) the receipt</div>
+            <input type="file" id="receiptFileInput" accept="image/*,application/pdf" style="display:none">
+            <img id="receipt-file-preview" alt="Receipt preview" style="display:none">
+            <div class="info-location" id="receiptFileName">Waiting for file selection (optional)&hellip;</div>
+            <label for="receiptUrl">Receipt URL <span class="opt-tag">fallback</span></label>
+            <input type="text" id="receiptUrl" placeholder="Or paste a receipt link instead of attaching" autocomplete="off">
         </div>
 
         <div class="button-container">
             <button id="submitButton" type="button">Submit Payout</button>
+            <button id="batchSubmitButton" type="button" style="display:none;">Submit Batch Payout</button>
         </div>
 
         <div id="status" aria-live="polite"></div>
+        <div id="batchSummary" class="batch-summary"></div>
 
         <div id="submissionResult" aria-live="polite">
             <h3>Signed payload sent to Edgar</h3>
@@ -215,8 +356,900 @@
             const ASSET_VERIFY_ENDPOINT = (window.Routes && window.Routes.gas && window.Routes.gas.assetVerify)
                 || 'https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec';
 
+            // Governor-only read of the recorded payout registrations. The endpoint
+            // returns MASKED fields only (never the raw PIX) -- we render the full
+            // pk_hash + masked key so the operator picks the correct account instead
+            // of transcribing a hash by hand and mis-sending.
+            const PAYOUT_REG_ENDPOINT = (window.Routes && window.Routes.gas && window.Routes.gas.payoutRegistrations)
+                || 'https://script.google.com/macros/s/AKfycbxQDdGnwS7G6iJhNj9japW-9sFA7EUvrnznmJCu44S5ZHqOoIks2be4FXbIVpuaOHVW/exec';
+
+            // Governor-only read of the CFR program `tree planting` tab: `tree_id -> pk_hash`.
+            // Lets a picked tree auto-fill the recipient and show its details. Hash-only,
+            // no raw PII. Same Apps Script project (and therefore URL) as the register read.
+            const TREE_RECIPIENT_ENDPOINT = PAYOUT_REG_ENDPOINT;
+
             const U = window.PayoutEventUtils;
-            const FIELDS = ['amount', 'paidAt', 'bankRef', 'recipientName', 'programSlug', 'treeIds', 'recipientPkHash', 'receiptUrl'];
+            const FIELDS = ['amount', 'paidAt', 'bankRef', 'programSlug', 'recipientPkHash', 'receiptUrl'];
+
+            // ---- Overpay guards (possible-duplicate + co-located) -----------
+            // Advisory surface ONLY: computed client-side from the public pending
+            // tree list. Never enters the signed payload; never touches PIX.
+            const SUNMINT_PENDING_URL = 'https://raw.githubusercontent.com/TrueSightDAO/lineage-assets/main/sunmint_pending.json';
+            let _overpayFlags = null;
+            let _pendingTrees = [];
+            let _treeRecipientMap = {};   // tree_id -> pk_hash (cache-first: public feed; GAS fallback)
+            let _treeRecipientMapLoaded = false;   // true once the recipient lookup settles (feed or GAS)
+            let _treeRecipientMapFromFeed = false;   // true once the public feed supplied inline recipient_pk_hash
+            let _recipientMapGasStarted = false;   // guards the GAS fallback to a single in-flight attempt
+            let _maskedKeyByPk = {};      // pk_hash -> {pix_key_type, pix_key_masked} (masked-only)
+            let _autoFilledPk = '';       // the pk_hash WE filled, so we never clobber a typed one
+            let _urlParamApplied = false; // ?tree_id= deep-link applied ONCE, after the feed loads
+            let _programOptionsLoaded = false; // Program dropdown populated from its SSOT
+            let _farmOptionsLoaded = false;    // Farm dropdown populated from its SSOT
+            let _urlFiltersApplied = false;    // ?farm=&plot=&program= applied ONCE (after both load)
+            let _pendingHasProgramData = false;  // does the pending feed carry program attribution?
+            const RECEIPT_REPO_BASE_URL = 'https://github.com/TrueSightDAO/payout-receipts-raw/blob/main/receipts/';
+            let uploadedReceiptFile = null;
+            let cachedReceiptFileName = null;
+            let _submittedTreeIds = {};      // ids already paid in THIS session -> hidden from the picker
+            let _awaitingAnotherPayout = false;
+            let _selectedTreeId = '';        // picker selection -- the tree being paid (drives autofill/reject)
+            let _programHosts = {};          // host -> program slug (from the registry, SSOT)
+            let _signedInName = '';          // resolved contributor name (for the reject payload)
+            let _plotsGeojson = null;        // sunmint/plots/index.geojson (SSOT for the Farm/Plot spatial join)
+            let _farmsById = {};             // farm_id -> farm record (sunmint/farms/index.json)
+            let _batchMode = false;          // cluster backfill: tick N trees, one lump transfer
+            let _batchSelected = {};         // tree_id -> 1 (batch checkbox selection)
+
+            function loadPendingTrees() {
+                if (typeof fetch !== 'function') return;
+                return fetch(SUNMINT_PENDING_URL, { cache: 'no-cache' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        _pendingTrees = (data && data.items) || [];
+                        _overpayFlags = U.computeOverpayFlags(_pendingTrees);
+                        _pendingHasProgramData = U.feedHasProgramData(_pendingTrees);  // matches treesForProgram()'s join keys
+                        // CACHE-FIRST recipient map: the feed now carries
+                        // `recipient_pk_hash` inline, so seed the lookup from it BEFORE
+                        // applyUrlTreeParam() so a deep-linked tree fills immediately.
+                        seedRecipientMapFromFeed();
+                        renderTreeOptions();
+                        renderOverpayGuard();
+                        renderTreeDetails();
+                        renderOverpayTreeDetails();
+                        applyUrlTreeParam();   // honor ?tree_id= once the picker has options
+                        // Fallback ONLY when the feed carried no inline recipient data
+                        // (e.g. an older cache): fetch the governor-only GAS map.
+                        if (!_treeRecipientMapFromFeed) loadTreeRecipientMap();
+                    })
+                    .catch(function () {
+                        _pendingTrees = []; _overpayFlags = null; renderOverpayGuard(); renderOverpayTreeDetails();
+                        // The feed failed, so the cache-first path is unavailable --
+                        // fall back to the governor-only GAS map.
+                        loadTreeRecipientMap();
+                    });
+            }
+
+            // Fold the inline `recipient_pk_hash` the public pending feed now carries
+            // (emitted by lineage-assets from the private `tree planting` tab) into the
+            // recipient map. CACHE-FIRST: the page already fetches this feed, so
+            // autofill needs no separate GAS round-trip and is immune to the shared
+            // Apps Script deployment's queueing delay. Marks the lookup settled so the
+            // hint never says "still loading" once the answer has already arrived.
+            function seedRecipientMapFromFeed() {
+                var feedMap = U.buildRecipientMapFromFeed(_pendingTrees);
+                var any = false;
+                Object.keys(feedMap).forEach(function (id) {
+                    if (!_treeRecipientMap[id]) _treeRecipientMap[id] = feedMap[id];
+                    any = true;
+                });
+                if (!any) return;
+                _treeRecipientMapFromFeed = true;
+                _treeRecipientMapLoaded = true;
+                maybeAutoFillRecipient(_selectedTreeId ? [_selectedTreeId] : []);
+                updateRecipientLookupHint();
+                renderTreeDetails();
+            }
+
+            function currentProgram() {
+                const el = $('programSlug');
+                return el ? String(el.value || '').trim() : '';
+            }
+
+            // Populate the Program dropdown from the live registry (SSOT) so a new
+            // program appears without a code change. Keeps the current selection.
+            function loadProgramOptions() {
+                const sel = $('programSlug');
+                if (!sel) return;
+                const keep = sel.value || 'crf-anapu';
+                fetch('https://raw.githubusercontent.com/TrueSightDAO/lineage-engine/main/scripts/sunmint_program_registry.json', { cache: 'no-cache' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (reg) { _programHosts = U.programSlugsByHost(reg); applyProgramOptions(sel, U.programsFromRegistry(reg), keep); })
+                    .catch(function () { /* keep the static options */ });
+            }
+
+            function applyProgramOptions(sel, slugs, keep) {
+                var opts = ['<option value="">(no program \u2014 general disbursement)</option>'];
+                var seen = {};
+                (slugs || []).forEach(function (s) {
+                    if (s && !seen[s]) { seen[s] = 1; opts.push('<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>'); }
+                });
+                if (keep && !seen[keep]) opts.splice(1, 0, '<option value="' + escapeHtml(keep) + '">' + escapeHtml(keep) + '</option>');
+                sel.innerHTML = opts.join('');
+                sel.value = keep || '';
+                renderProgramFilterNote();
+                _programOptionsLoaded = true;
+                tryApplyUrlFilters();
+            }
+
+            // Loud-failure affordance: when a program is chosen but the feed carries
+            // NO program attribution at all, the filter cannot narrow -- say so
+            // instead of silently listing every unpaid tree as if it had applied.
+            function renderProgramFilterNote() {
+                const el = $('programFilterNote');
+                if (!el) return;
+                if (U.programFilterNotApplied(currentProgram(), _pendingTrees, _pendingHasProgramData)) {
+                    el.style.display = 'block';
+                    el.style.color = '#8a6d3b';
+                    el.innerHTML = 'Program filter not applied: the unpaid-tree feed carries no program attribution yet, so all unpaid trees are still listed. Once the feed records each tree\u2019s program, choosing a program narrows this list.';
+                } else {
+                    el.style.display = 'none';
+                    el.innerHTML = '';
+                }
+            }
+
+            // STRICT program filter: a chosen program narrows to trees whose
+            // attribution EQUALS it (unattributed rows are hidden, never shown as if
+            // they matched). A blank program = general disbursement = every tree.
+            // While the feed carries no attribution at all the filter cannot narrow,
+            // so the list stays complete and renderProgramFilterNote() says so.
+            function treesForProgram(program) {
+                return U.treesForProgram(_pendingTrees, program, _programHosts, _pendingHasProgramData);
+            }
+
+            // ── Farm / Plot filter (mirrors the Program filter above) ────────────
+            // Program and Farm/Plot are INDEPENDENT facets (AND), plot nests in farm.
+
+            function currentFarm() {
+                const el = $('farmFilter');
+                return el ? String(el.value || '').trim() : '';
+            }
+
+            function currentPlot() {
+                const el = $('plotFilter');
+                return el ? String(el.value || '').trim() : '';
+            }
+
+            // Load the farm/plot SSOTs (plot polygons + farms index) once, then populate
+            // the Farm dropdown. Keeps the current selection.
+            function loadFarmPlotOptions() {
+                if (typeof fetch !== 'function') return;
+                Promise.all([
+                    fetch('https://raw.githubusercontent.com/TrueSightDAO/sunmint/main/plots/index.geojson', { cache: 'no-cache' }).then(function (r) { return r.json(); }).catch(function () { return null; }),
+                    fetch('https://raw.githubusercontent.com/TrueSightDAO/sunmint/main/farms/index.json', { cache: 'no-cache' }).then(function (r) { return r.json(); }).catch(function () { return null; })
+                ]).then(function (res) {
+                    _plotsGeojson = res[0];
+                    _farmsById = U.farmsById(res[1]);
+                    applyFarmOptions();
+                    renderTreeOptions();
+                }).catch(function () { /* leave the selects as they are */ });
+            }
+
+            // Farm options = only farms that actually carry a plot in the geojson (so the
+            // dropdown never offers a farm the join can never match), labelled by the
+            // farms-index display name.
+            function applyFarmOptions() {
+                const sel = $('farmFilter');
+                if (!sel) return;
+                const keep = sel.value || '';
+                var ids = U.farmsWithPlots(_plotsGeojson);
+                var opts = ['<option value="">(all farms)</option>'];
+                ids.forEach(function (id) {
+                    var f = _farmsById[id] || {};
+                    var label = (f.name ? f.name : id) + (f.region ? ' - ' + f.region : '');
+                    opts.push('<option value="' + escapeHtml(id) + '">' + escapeHtml(label) + '</option>');
+                });
+                sel.innerHTML = opts.join('');
+                sel.value = ids.indexOf(keep) !== -1 ? keep : '';
+                applyPlotOptions();
+                _farmOptionsLoaded = true;
+                tryApplyUrlFilters();
+            }
+
+            // Cascade: the Plot dropdown lists only the chosen farm's plots. With no farm
+            // chosen, plot narrowing is disabled (the facet is not applied).
+            function applyPlotOptions() {
+                const sel = $('plotFilter');
+                if (!sel) return;
+                const farm = currentFarm();
+                const keep = sel.value || '';
+                if (!farm) {
+                    sel.innerHTML = '<option value="">(all plots)</option>';
+                    sel.disabled = true;
+                    sel.value = '';
+                    renderFarmPlotFilterNote();
+                    return;
+                }
+                sel.disabled = false;
+                var plots = U.plotsForFarm(_plotsGeojson, farm);
+                var opts = ['<option value="">(all plots)</option>'];
+                plots.forEach(function (pid) {
+                    opts.push('<option value="' + escapeHtml(pid) + '">' + escapeHtml(pid) + '</option>');
+                });
+                sel.innerHTML = opts.join('');
+                sel.value = plots.indexOf(keep) !== -1 ? keep : '';
+                renderFarmPlotFilterNote();
+            }
+
+            // -- Filter state <-> URL (farm/plot/program) -------------------------
+            // Changing Farm/Plot/Program mirrors the facets into the URL so the
+            // filtered view is shareable/bookmarkable; a colleague opening the link
+            // lands on the same cluster. Defaults are omitted so a pristine link stays
+            // clean. Composes with ?tx= / ?tree_id= (each touches only its own keys).
+            const FILTER_URL_DEFAULTS = { farm: '', plot: '', program: 'crf-anapu' };
+
+            // Mirror the current filter facets into the URL (replaceState -- no history spam).
+            function setUrlFilterParams() {
+                try {
+                    const u = new URL(window.location.href);
+                    const wanted = U.filterUrlParams(
+                        { farm: currentFarm(), plot: currentPlot(), program: currentProgram() },
+                        FILTER_URL_DEFAULTS
+                    );
+                    U.FILTER_URL_KEYS.forEach(function (k) {
+                        if (Object.prototype.hasOwnProperty.call(wanted, k)) u.searchParams.set(k, wanted[k]);
+                        else u.searchParams.delete(k);
+                    });
+                    window.history.replaceState({}, '', u.toString());
+                } catch (e) { console.warn('setUrlFilterParams', e); }
+            }
+
+            // Apply ?farm=&plot=&program= ONCE, after BOTH dropdowns are populated.
+            // A facet the SSOT does not offer is ignored (graceful), never forced.
+            function tryApplyUrlFilters() {
+                if (_urlFiltersApplied || !_programOptionsLoaded || !_farmOptionsLoaded) return;
+                _urlFiltersApplied = true;
+                try {
+                    const f = U.parseFilterUrl(window.location.search, FILTER_URL_DEFAULTS);
+                    const ps = $('programSlug');
+                    if (ps && Array.prototype.some.call(ps.options, function (o) { return o.value === f.program; })) ps.value = f.program;
+                    const fs = $('farmFilter');
+                    if (fs && f.farm && Array.prototype.some.call(fs.options, function (o) { return o.value === f.farm; })) fs.value = f.farm;
+                    applyPlotOptions();
+                    const pls = $('plotFilter');
+                    if (pls && f.plot && Array.prototype.some.call(pls.options, function (o) { return o.value === f.plot; })) pls.value = f.plot;
+                    renderTreeOptions();
+                    setUrlFilterParams();   // normalize: drop facets the data could not honor
+                } catch (e) { console.warn('tryApplyUrlFilters', e); }
+            }
+
+            // Loud-failure affordance mirrored from renderProgramFilterNote: when a
+            // farm/plot is chosen but no pending tree could be spatially located, say so
+            // rather than imply the filter narrowed.
+            function renderFarmPlotFilterNote() {
+                const el = $('farmPlotFilterNote');
+                if (!el) return;
+                if (U.farmPlotFilterNotApplied(currentFarm(), currentPlot(), _pendingTrees, _plotsGeojson)) {
+                    el.style.display = 'block';
+                    el.style.color = '#8a6d3b';
+                    el.textContent = 'Farm/Plot filter not applied: none of the unpaid trees could be located in a registered plot (they may lack coordinates or fall outside every plot boundary), so all unpaid trees are still listed.';
+                } else {
+                    el.style.display = 'none';
+                    el.textContent = '';
+                }
+            }
+
+            // The PICKER lists only UNPAID trees (the public pending cache is already
+            // Status==NEW, i.e. not-yet-paid). Trees paid in THIS session are dropped
+            // via _submittedTreeIds so a just-paid tree cannot be picked twice.
+            // The ONE source of filtered unpaid rows -- shared by the single-tree picker
+            // and the batch checkbox list, so the two can never drift apart.
+            function currentFilteredRows() {
+                return U.treesForFarmPlot(
+                    treesForProgram(currentProgram()), currentFarm(), currentPlot(), _plotsGeojson
+                ).filter(function (t) {
+                    var id = String(t.telegram_message_id || t.tree_id || '').trim();
+                    return id && !_submittedTreeIds[id];
+                });
+            }
+
+            function renderTreeOptions() {
+                const sel = $('treePicker');
+                if (!sel) return;
+                const chosen = {};
+                if (_selectedTreeId) chosen[_selectedTreeId] = 1;
+                const rows = currentFilteredRows();
+                const opts = ['<option value="">\u2014 pick an unpaid tree \u2014</option>'];
+                rows.forEach(function (t) {
+                    var id = String(t.telegram_message_id || t.tree_id || '').trim();
+                    var parts = [t.species, t.planting_date].filter(Boolean).join(', ');
+                    var f = _overpayFlags && _overpayFlags[id];
+                    var warn = '';
+                    if (f) {
+                        var why = [];
+                        if (f.duplicate) why.push('duplicate');
+                        if (f.colocated) why.push('same-fix');
+                        warn = ' \u26a0 ' + why.join('/');
+                    }
+                    var tail = chosen[id] ? ' \u2713' : '';
+                    opts.push('<option value="' + escapeHtml(id) + '">' +
+                        escapeHtml(dispId(id) + (parts ? ' \u2014 ' + parts : '') + warn + tail) + '</option>');
+                });
+                sel.innerHTML = opts.join('');
+                sel.value = chosen[_selectedTreeId] ? _selectedTreeId : '';
+                renderProgramFilterNote();
+                renderFarmPlotFilterNote();
+                renderBatchList();
+            }
+
+            // Single-select: picking a tree REPLACES the current selection.
+            function addPickedTree() {
+                const sel = $('treePicker');
+                if (!sel) return;
+                if (!sel.value) { selectTreeById(''); return; }  // placeholder re-picked -> clear
+                selectTreeById(sel.value);
+            }
+
+            // Mirror the picker selection into the URL so a ticket or a colleague's link
+            // reopens EXACTLY this tree. Gary (2026-09-29): prefer the SHORT transaction
+            // handle -- `?tx=CxSlFq7R` (the same `tx:<handle>` the dropdown already shows)
+            // -- over the long `?tree_id=Edgar_...`; a row with no signed txid still falls
+            // back to `?tree_id=<canonical id>` so nothing becomes unlinkable. Display/
+            // deep-link ONLY -- the signed payload keeps keying off the picker value.
+            function setUrlTreeParam(id) {
+                try {
+                    const u = new URL(window.location.href);
+                    u.searchParams.delete('tree_id');
+                    u.searchParams.delete('tx');
+                    const v = String(id || '').trim();
+                    if (v) {
+                        const t = U.findPendingTree(_pendingTrees, v);
+                        const sel = U.selectionUrlParam(t, v);
+                        if (sel) u.searchParams.set(sel.key, sel.value);
+                    }
+                    window.history.replaceState({}, '', u.toString());
+                } catch (e) { console.warn('setUrlTreeParam', e); }
+            }
+
+            // Apply a URL deep-link ONCE, after the feed populates the picker. Accepts
+            // `?tx=<short handle>` (preferred, Gary 2026-09-29) resolved against the feed
+            // by substring, and the legacy `?tree_id=<canonical id>` so old tickets still
+            // open. Returns true only when it actually selected a listed tree.
+            function applyUrlTreeParam() {
+                if (_urlParamApplied) return false;
+                _urlParamApplied = true;
+                try {
+                    const u = new URL(window.location.href);
+                    const tx = String(u.searchParams.get('tx') || '').trim();
+                    const legacy = String(u.searchParams.get('tree_id') || '').trim();
+                    const sel = $('treePicker');
+                    if (!sel) return false;
+                    let id = tx ? U.resolveTxHandle(_pendingTrees, tx) : '';
+                    if (!id) id = legacy;
+                    if (!id) return false;
+                    const isOption = Array.prototype.some.call(sel.options, function (o) { return o.value === id; });
+                    if (!isOption) return false;
+                    selectTreeById(id);
+                    return true;
+                } catch (e) { console.warn('applyUrlTreeParam', e); return false; }
+            }
+
+            // Picker selection: sets the tree that will be PAID and refreshes the
+            // Tree Details card + the guard (autofill + reject both key off it).
+            function selectTreeById(id) {
+                id = String(id || '').trim();
+                _selectedTreeId = id;
+                const sel = $('treePicker');
+                if (sel) {
+                    const isOption = !!id && Array.prototype.some.call(sel.options, function (o) { return o.value === id; });
+                    sel.value = isOption ? id : '';
+                }
+                maybeAutoFillRecipient(id ? [id] : []);
+                updateRecipientLookupHint();
+                renderTreeDetails();
+                renderOverpayTreeDetails();
+                renderOverpayGuard();
+                setUrlTreeParam(id);
+            }
+
+            // After a payout lands, hide the paid trees + offer a fresh form.
+            function markPaidAndArmReset(form) {
+                const paidId = String(_selectedTreeId || (form && form.treeIds) || '').trim();
+                if (paidId) _submittedTreeIds[paidId] = 1;
+                _selectedTreeId = '';
+                const tp = $('treePicker'); if (tp) tp.value = '';
+                renderTreeOptions();
+                renderTreeDetails();
+                renderOverpayTreeDetails();
+                renderOverpayGuard();
+                const btn = $('submitButton');
+                if (btn) btn.textContent = 'Submit another payout';
+                _awaitingAnotherPayout = true;
+                setStatus('Payout recorded. The paid tree is no longer selectable \u2014 click \u201cSubmit another payout\u201d for a new one.', 'success');
+            }
+
+            function resetForm() {
+                ['amount', 'paidAt', 'bankRef', 'recipientPkHash', 'receiptUrl']
+                    .forEach(function (id) { const el = $(id); if (el) el.value = ''; });
+                _selectedTreeId = '';
+                const tp = $('treePicker'); if (tp) tp.value = '';
+                renderTreeDetails();
+                renderOverpayTreeDetails();
+                uploadedReceiptFile = null;
+                updateReceiptInfo('');
+                const rp = $('receipt-file-preview'); if (rp) { rp.style.display = 'none'; rp.src = ''; }
+                const ps = $('programSlug'); if (ps) ps.value = 'crf-anapu';
+                const cur = $('currency'); if (cur) cur.value = 'BRL';
+                const brt = $('bankRefType'); if (brt) brt.value = 'PIX-E2E';
+                const sr = $('submissionResult'); if (sr) sr.style.display = 'none';
+                clearInvalid();
+                _awaitingAnotherPayout = false;
+                const btn = $('submitButton'); if (btn) btn.textContent = 'Submit Payout';
+                setStatus('');
+                _autoFilledPk = '';
+                renderTreeOptions();
+                renderOverpayGuard();
+                renderTreeDetails();
+                setUrlFilterParams();
+            }
+
+            // One card per id currently in the tree field: species, planting date,
+            // coordinates, photo, and -- when the governor-only map resolves it -- the
+            // recipient pk_hash the payout would link to.
+            // The detail card for the ONE currently-selected tree: species, planting
+            // date, coordinates, photo, and -- when the governor-only map resolves it
+            // -- the recipient pk_hash the payout would link to.
+            // Display identity for a tree id: the signed `Request Transaction ID`
+            // rendered `tx:<8>` when the row carries one, else the transport id.
+            // LABEL ONLY -- every map, the picker value and the signed payload keep
+            // the canonical id, so autofill/reject/consumer joins are unchanged.
+            function dispId(id) {
+                id = String(id || '').trim();
+                if (!id) return '';
+                var t = U.findPendingTree(_pendingTrees, id);
+                return U.treeDisplayId(t) || id;
+            }
+
+            // The SPECIFIC collision reason for `id` (duplicate / co-located, with
+            // distances), as a yellow note. Rendered INLINE on the Overpay Conflict
+            // card so the "why" reads without scrolling to the guard section below
+            // (Gary, 2026-09-24, thread 35944). '' when `id` is unflagged.
+            function overpayReasonHtml(id) {
+                const f = _overpayFlags[String(id || '').trim()];
+                if (!f) return '';
+                const bits = [];
+                if (f.duplicate) {
+                    bits.push('possible <strong>duplicate</strong>' +
+                        (f.duplicate_with.length ? ' \u2014 same record as ' + escapeHtml(f.duplicate_with.map(dispId).join(', ')) : ''));
+                }
+                if (f.colocated) {
+                    bits.push('<strong>same GPS fix</strong> as ' + escapeHtml(
+                        f.colocated_with.map(function (c) { return dispId(c.tree_id) + ' (' + c.meters + ' m)'; }).join(', ')));
+                }
+                if (!bits.length) return '';
+                return '<div class="overpay-row">\u26a0 <code>' + escapeHtml(dispId(id)) + '</code>: ' + bits.join(' \u00b7 ') + '</div>';
+            }
+
+            // Payee-viewable link for `t`: a public /my-trees/?tree=<id> deep link on
+            // the viewer host its PROGRAM belongs to (cfr vs SunMint beta), so a
+            // governor can copy ONE link and WhatsApp it to the payee, who opens it
+            // with no key and sees just their tree (sunmint_beta #98). Omitted when
+            // the row has no id, or for a card whose row is not in the pending feed.
+            function payeeLinkHtml(t) {
+                if (!t) return '';
+                const url = U.payeeMyTreesUrl(t, _programHosts);
+                if (!url) return '';
+                return '<div class="tc-payee">' +
+                    '<a class="tc-copy" href="#" role="button" data-copy-url="' + escapeHtml(url) + '">' +
+                    '\uD83D\uDD17 Copy payee link</a>' +
+                    '<span class="tc-payee-url" title="Share this with the payee">' + escapeHtml(url) + '</span>' +
+                    '</div>';
+            }
+
+            // Copy the payee link. Clipboard API when available (it needs a secure
+            // context — the deployed sites are https), else a hidden-textarea
+            // fallback so the click still works on http/localhost. On success the
+            // link flips to a green "Copied!" for a beat as the only feedback.
+            function copyText(text, el) {
+                function done() {
+                    if (!el) return;
+                    const label = el.textContent;
+                    el.textContent = '\u2713 Copied!';
+                    el.classList.add('is-copied');
+                    setTimeout(function () { el.textContent = label; el.classList.remove('is-copied'); }, 1500);
+                }
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(done).catch(function () { fallback(); });
+                } else { fallback(); }
+                function fallback() {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text; ta.setAttribute('readonly', '');
+                        ta.style.position = 'fixed'; ta.style.left = '-9999px';
+                        document.body.appendChild(ta); ta.select();
+                        document.execCommand('copy'); document.body.removeChild(ta);
+                        done();
+                    } catch (_) { /* clipboard unavailable — the URL is on screen to copy by hand */ }
+                }
+            }
+
+            function treeCardHtml(id) {
+                const t = U.findPendingTree(_pendingTrees, id);
+                const pk = _treeRecipientMap[id] || '';
+                const fields = U.treeDetailFields(t);
+                const meta = fields.filter(function (f) { return f[0] !== 'Tree ID'; })
+                    .map(function (f) { return escapeHtml(f[0]) + ': ' + escapeHtml(f[1]); })
+                    .join(' &middot; ');
+                const photo = (t && t.photo_url)
+                    ? '<img class="tc-photo" src="' + escapeHtml(t.photo_url) + '" alt="Tree photo" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+                    : '';
+                const mk = (pk && _maskedKeyByPk[pk]) ? _maskedKeyByPk[pk] : null;
+                const mkText = mk ? [mk.pix_key_type, mk.pix_key_masked].filter(Boolean).join(' ') : '';
+                const pkLine = pk
+                    ? '<div class="tc-pk">\uD83D\uDD17 recipient pk_hash: <strong>' + escapeHtml(pk) + '</strong>' +
+                      (mkText ? '<span class="tc-masked">\uD83D\uDD12 partial key: ' + escapeHtml(mkText) + '</span>' : '') +
+                      '</div>'
+                    : '<div class="tc-none">No registered recipient for this tree \u2014 leave recipient blank (records as unlinked_recipient).</div>';
+                return '<div class="tree-card">' + photo +
+                    '<div class="tc-main"><div class="tc-id">' + escapeHtml(dispId(id)) + '</div>' +
+                    (meta ? '<div class="tc-meta">' + meta + '</div>'
+                          : '<div class="tc-meta">Not in the public pending list (already paid, or not currently selectable).</div>') +
+                    pkLine + payeeLinkHtml(t) + '</div></div>';
+            }
+
+            function renderTreeDetails() {
+                const host = $('treeDetails');
+                if (!host) return;
+                const id = String(_selectedTreeId || '').trim();
+                host.innerHTML = id ? treeCardHtml(id) : '';
+                // The reject action is meaningful only with a tree selected.
+                const zone = $('invalidZone');
+                if (zone) zone.style.display = id ? 'flex' : 'none';
+            }
+
+            // The SECOND card answers the operator's ONLY question about the selected
+            // tree -- "should I pay for this one?" -- by showing the tree(s) the
+            // SELECTION collides with (nearest co-located first, then duplicate
+            // partners), or an explicit all-clear when the selection is clean. It is
+            // DERIVED from the picker selection, so there is no second, independent
+            // selection to drift out of sync with what actually gets submitted.
+            function renderOverpayTreeDetails() {
+                const host = $('overpayTreeDetails');
+                if (!host) return;
+                const reasonHost = $('overpayReason');
+                const id = String(_selectedTreeId || '').trim();
+                if (!id) {
+                    host.innerHTML = '<div class="compare-empty">Pick a tree above to check it for overpay risk.</div>';
+                    if (reasonHost) reasonHost.innerHTML = '';
+                    return;
+                }
+                // The reason sits ON the card -- under the heading, above the
+                // compared tree(s) -- so it reads without scrolling to the guard below.
+                if (reasonHost) reasonHost.innerHTML = overpayReasonHtml(id);
+                const partners = U.overpayConflictPartners(_overpayFlags, id);
+                if (!partners.length) {
+                    host.innerHTML = '<div class="compare-clear">&#10003; <strong>No overpay risk found.</strong> ' +
+                        'Nothing shares this tree&rsquo;s photo or id, and no other tree is within ' +
+                        U.OVERPAY_SAME_FIX_METERS + ' m.</div>';
+                    return;
+                }
+                host.innerHTML = partners.map(function (pid) { return treeCardHtml(pid); }).join('');
+            }
+
+            // Honest feedback for the recipient lookup. getTreeRecipientMap and
+            // getPendingPayoutRegistrations are served by the SAME Apps Script
+            // deployment, so on page load the platform serialises them and the map
+            // can answer several seconds late. Without this hint a still-loading
+            // lookup is indistinguishable from "no registration found", and the
+            // operator reasonably concludes the page is broken.
+            function updateRecipientLookupHint() {
+                const el = $('recipientLookupStatus');
+                if (!el) return;
+                const id = String(_selectedTreeId || '').trim();
+                const pkEl = $('recipientPkHash');
+                const filled = !!(pkEl && String(pkEl.value || '').trim());
+                if (!id || filled) { el.textContent = ''; el.className = 'hint'; return; }
+                if (!_treeRecipientMapLoaded) {
+                    el.textContent = 'Looking up recipient\u2026';
+                    el.className = 'hint loading';
+                    return;
+                }
+                if (_treeRecipientMap[id]) {
+                    // Map has an entry; if the field is still blank the retroactive
+                    // fill is imminent -- don't cry "not found".
+                    el.textContent = '';
+                    el.className = 'hint';
+                    return;
+                }
+                el.textContent = 'No payout registration found for this tree \u2014 enter the pk_hash manually if known.';
+                el.className = 'hint';
+            }
+
+            function loadTreeRecipientMap() {
+                if (typeof fetch !== 'function') return;
+                // Cache-first: the public feed already supplied the map, so skip the
+                // GAS round-trip entirely (and never double-fire the fallback).
+                if (_treeRecipientMapFromFeed || _recipientMapGasStarted) return;
+                _recipientMapGasStarted = true;
+                var attempt = 0;
+                var MAX_ATTEMPTS = 3;
+                function wait(n) { return new Promise(function (res) { setTimeout(res, 400 * n); }); }
+                function run() {
+                    attempt += 1;
+                    return fetch(TREE_RECIPIENT_ENDPOINT + '?action=getTreeRecipientMap', { cache: 'no-cache' })
+                        .then(function (r) { return r.text(); })
+                        .then(function (txt) {
+                            var data = null;
+                            var ok = false;
+                            if (txt && txt.trim()) {
+                                try { data = JSON.parse(txt); ok = true; } catch (_) { ok = false; }
+                            }
+                            // The endpoint is known to answer 302 with a 0-byte body while
+                            // cold. Retry a bounded number of times before giving up.
+                            if (!ok) {
+                                if (attempt < MAX_ATTEMPTS) return wait(attempt).then(run);
+                                _treeRecipientMap = {};
+                                _treeRecipientMapLoaded = true;
+                                updateRecipientLookupHint();
+                                return;
+                            }
+                            _treeRecipientMap = U.buildTreeRecipientMap(data);
+                            _treeRecipientMapLoaded = true;
+                            // The map can land AFTER the operator already picked a tree --
+                            // fill the recipient retroactively so the load-order race can
+                            // never strand a resolvable selection.
+                            maybeAutoFillRecipient(_selectedTreeId ? [_selectedTreeId] : []);
+                            renderTreeDetails();
+                            updateRecipientLookupHint();
+                        })
+                        .catch(function () {
+                            if (attempt < MAX_ATTEMPTS) return wait(attempt).then(run);
+                            _treeRecipientMap = {};
+                            _treeRecipientMapLoaded = true;
+                            updateRecipientLookupHint();
+                        });
+                }
+                return run();
+            }
+
+            // Auto-fill the recipient pk_hash when the selection resolves to exactly ONE
+            // tree. Never clobbers an operator-entered hash: we only overwrite an empty
+            // field, or a value we ourselves filled.
+            function maybeAutoFillRecipient(ids) {
+                const pkEl = $('recipientPkHash');
+                if (!pkEl) return;
+                const resolved = ids.map(function (id) { return _treeRecipientMap[id] || ''; })
+                    .filter(Boolean)
+                    .filter(function (v, i, a) { return a.indexOf(v) === i; });
+                // We may only overwrite an empty field or a value WE auto-filled; an
+                // operator-typed hash (or one they explicitly chose) is never clobbered.
+                const cur = String(pkEl.value || '').trim();
+                if (cur !== '' && cur !== _autoFilledPk) return;
+                if (ids.length === 1 && resolved.length === 1) {
+                    pkEl.value = resolved[0];
+                    pkEl.classList.remove('invalid');
+                    _autoFilledPk = resolved[0];
+                    return;
+                }
+                // The newly-selected tree has NO registered recipient (or the selection
+                // was cleared): drop the value WE filled, so one tree's pk_hash can never
+                // ride along with a different tree. Operator-typed values are untouched.
+                if (cur !== '' && cur === _autoFilledPk) {
+                    pkEl.value = '';
+                    _autoFilledPk = '';
+                }
+            }
+
+            function renderOverpayGuard() {
+                const host = $('overpayGuard');
+                if (!host) return;
+                if (!_overpayFlags) { host.innerHTML = ''; return; }
+                const selected = String(_selectedTreeId || '').trim();
+                const flagged = Object.keys(_overpayFlags).sort();
+                let html = '<div class="overpay-summary">Overpay guard: <strong>' + flagged.length +
+                    '</strong> pending tree(s) carry a risk flag. ' +
+                    (selected ? 'Checking <code>' + escapeHtml(dispId(selected)) + '</code>.'
+                              : 'Pick a tree above to check it.') +
+                    '<div class="overpay-legend">A tree is flagged when it <strong>shares a photo</strong> with another row, ' +
+                    '<strong>repeats a tree id</strong>, or sits on the <strong>same GPS fix</strong> as a <em>different</em> tree ' +
+                    '(a stale fix can put several distinct picks on ONE coordinate).</div></div>';
+
+                // NOTE: the selected tree's SPECIFIC collision reason is rendered
+                // INLINE on the Overpay Conflict card (overpayReasonHtml), NOT here --
+                // the guard keeps only the summary, the filter legend and the
+                // all-flagged list (Gary, 2026-09-24, thread 35944).
+                if (flagged.length) {
+                    html += '<details class="overpay-all"><summary>Show all ' + flagged.length +
+                        ' flagged tree(s) \u2014 with reasons; click one to select it</summary><div class="overpay-all-list">' +
+                        flagged.map(function (id) {
+                            // Reason partner ids render in DISPLAY form (tx:<8>); the
+                            // stored flag keys stay canonical.
+                            var why = U.overpayReasonBits(_overpayFlags[id], { labelFor: dispId }).join(' \u00b7 ');
+                            var isSel = (id === selected) ? ' is-selected' : '';
+                            return '<div class="overpay-all-row' + isSel + '">' +
+                                '<button type="button" class="flagged-pick" data-tree-id="' + escapeHtml(id) + '">' +
+                                '<code>' + escapeHtml(dispId(id)) + '</code></button> \u2014 ' +
+                                escapeHtml(why) + '</div>';
+                        }).join('') +
+                        '</div></details>';
+                }
+                host.innerHTML = html;
+            }
+
+            // ── Batch backfill (Gary's cluster model, 2026-09-29) ──────────────────
+            // ONE lump transfer covering N trees. The sink books exactly ONE unit of
+            // `Cacao Tree - To Be Paid For` liability PER EVENT (fpeComputeLegs_ emits a
+            // single inv(main,-1,...) in every branch; fpeBookLedger_ discharges only the
+            // FIRST resolvable tree). So a batch MUST fire N single-tree [PAYOUT EVENT]s,
+            // each carrying total/N -- never one multi-tree event, which would silently
+            // under-book N-1 trees.
+            function renderBatchList() {
+                const host = $('batchList');
+                if (!host) return;
+                const rows = currentFilteredRows();
+                const present = {};
+                rows.forEach(function (t) { present[String(t.telegram_message_id || t.tree_id || '').trim()] = 1; });
+                // Prune selections that fell out of the current filter, so "N selected"
+                // always equals what the next submit will actually fire.
+                Object.keys(_batchSelected).forEach(function (id) { if (!present[id]) delete _batchSelected[id]; });
+                if (!rows.length) {
+                    host.innerHTML = '<div class="bp-sub" style="margin:0.2rem 0;">No unpaid trees match the current filters.</div>';
+                    updateBatchCount();
+                    return;
+                }
+                host.innerHTML = rows.map(function (t) {
+                    var id = String(t.telegram_message_id || t.tree_id || '').trim();
+                    var parts = [t.species, t.planting_date].filter(Boolean).join(', ');
+                    var checked = _batchSelected[id] ? ' checked' : '';
+                    return '<label><input type="checkbox" class="batch-cb" value="' + escapeHtml(id) + '"' + checked + '>' +
+                        '<span>' + escapeHtml(dispId(id) + (parts ? ' \u2014 ' + parts : '')) + '</span></label>';
+                }).join('');
+                updateBatchCount();
+            }
+
+            function selectedBatchTreeIds() {
+                var out = [];
+                currentFilteredRows().forEach(function (t) {
+                    var id = String(t.telegram_message_id || t.tree_id || '').trim();
+                    if (id && _batchSelected[id]) out.push(id);
+                });
+                return out;
+            }
+
+            function updateBatchCount() {
+                const el = $('batchCount');
+                if (el) el.textContent = selectedBatchTreeIds().length + ' selected';
+                renderBatchSplitNote();
+            }
+
+            // Honest preview of the split: total -> per-tree, plus any rounding drift.
+            function renderBatchSplitNote() {
+                const el = $('batchSplitNote');
+                if (!el) return;
+                const ids = selectedBatchTreeIds();
+                if (!ids.length) { el.textContent = ''; return; }
+                const split = U.splitBatchAmount($('amount').value, ids.length);
+                if (!split.valid) {
+                    el.textContent = 'Enter the batch total in Amount to split across ' + ids.length + ' tree(s).';
+                    return;
+                }
+                el.textContent = ids.length + ' tree(s) \u00b7 ' + split.total + ' total \u2192 ' + split.perTree +
+                    ' each' + (split.drift !== '0' ? ' (rounding drift ' + split.drift + ')' : '');
+            }
+
+            function renderBatchSummary(summary, total) {
+                const el = $('batchSummary');
+                if (!el) return;
+                var html = '';
+                if (summary.ok.length) {
+                    html += '<div class="bs-ok">\u2713 ' + summary.ok.length + ' paid: ' +
+                        summary.ok.map(function (id) { return escapeHtml(dispId(id)); }).join(', ') + '</div>';
+                }
+                if (summary.fail.length) {
+                    html += '<div class="bs-fail">\u26a0 ' + summary.fail.length + ' FAILED:</div><ul>' +
+                        summary.fail.map(function (f) {
+                            return '<li><code>' + escapeHtml(dispId(f.id)) + '</code> \u2014 ' + escapeHtml(f.reason) + '</li>';
+                        }).join('') + '</ul>';
+                }
+                if (summary.ok.length + summary.fail.length < total) {
+                    html += '<div class="loading">' + (summary.ok.length + summary.fail.length) + ' / ' + total + ' submitted\u2026</div>';
+                }
+                el.innerHTML = html;
+            }
+
+            async function submitBatch() {
+                const btn = $('batchSubmitButton');
+                clearInvalid();
+                setStatus('');
+                const ids = selectedBatchTreeIds();
+                if (!ids.length) { setStatus('Tick at least one tree to backfill.', 'error'); return; }
+                const split = U.splitBatchAmount($('amount').value, ids.length);
+                if (!split.valid) {
+                    $('amount').classList.add('invalid');
+                    setStatus('Batch total: ' + split.reason, 'error');
+                    return;
+                }
+                const base = readForm();
+                const check = U.validate(Object.assign({}, base, { amount: split.perTree, treeIds: ids[0] }));
+                if (!check.valid) {
+                    if (!U.isValidIso8601(base.paidAt)) $('paidAt').classList.add('invalid');
+                    if (!String(base.bankRef).trim()) $('bankRef').classList.add('invalid');
+                    setStatus(check.errors.join(' '), 'error');
+                    return;
+                }
+                const privateKey = (function () { try { return localStorage.getItem('privateKey'); } catch (_) { return null; } })();
+                if (!privateKey) {
+                    setStatus('Your private key is missing from this browser. Re-register via the Digital Signature Creator.', 'error');
+                    return;
+                }
+
+                var driftNote = (split.drift !== '0')
+                    ? ('\n\nRounding: ' + split.perTree + ' \u00d7 ' + ids.length + ' = ' + (Number(split.perTree) * ids.length).toFixed(2) +
+                       ', a ' + split.drift + ' difference vs the ' + split.total + ' total.')
+                    : '';
+                if (!window.confirm('Backfill ' + ids.length + ' trees with ONE transfer of ' +
+                        (base.currency || 'BRL') + ' ' + split.total + ' (' + split.perTree + ' per tree).' + driftNote +
+                        '\n\nThis fires ' + ids.length + ' separate [PAYOUT EVENT]s, sequentially. Proceed?')) {
+                    return;
+                }
+
+                btn.disabled = true;
+                const summary = { ok: [], fail: [] };
+                renderBatchSummary(summary, ids.length);
+
+                for (var i = 0; i < ids.length; i++) {
+                    var id = ids[i];
+                    setStatus('Submitting ' + (i + 1) + ' / ' + ids.length + ' \u2014 ' + dispId(id) + '\u2026', 'loading');
+                    try {
+                        const helper = new EdgarPayloadHelper({
+                            digitalSignature: publicKeyOrNull(),
+                            generationSource: window.location.href
+                        });
+                        const form = Object.assign({}, base, {
+                            amount: split.perTree,
+                            treeIds: id,
+                            recipientPkHash: _treeRecipientMap[id] || base.recipientPkHash || ''
+                        });
+                        const attributes = U.buildAttributes(form, { source: window.location.href });
+                        const signed = await helper.generatePayload({
+                            eventName: U.EVENT_NAME,
+                            attributes: attributes,
+                            privateKey: privateKey,
+                            digitalSignature: publicKeyOrNull(),
+                            generationSource: window.location.href
+                        });
+                        const submission = await EdgarSubmission.submitWithRetry({
+                            url: EDGAR_SUBMIT,
+                            text: signed.shareText,
+                            // Shared receipt: the opaque destination is IDENTICAL for every
+                            // tree, so re-sending the same bytes overwrites one path (safe).
+                            file: uploadedReceiptFile ? await EdgarSubmission.toSendableBlob(uploadedReceiptFile) : undefined,
+                            fileName: cachedReceiptFileName || undefined,
+                            attempts: 3
+                        });
+                        const result = submission.result || {};
+                        if (result.signature_verification === 'success') {
+                            summary.ok.push(id);
+                            _submittedTreeIds[id] = 1;
+                            delete _batchSelected[id];
+                        } else {
+                            summary.fail.push({ id: id, reason: 'submitted but Edgar did not confirm verified delivery' });
+                        }
+                    } catch (err) {
+                        summary.fail.push({ id: id, reason: err.message });
+                    }
+                    renderBatchSummary(summary, ids.length);
+                }
+
+                btn.disabled = false;
+                renderTreeOptions();   // drops the paid trees + re-renders the batch list
+                if (summary.fail.length) {
+                    setStatus('Batch finished: ' + summary.ok.length + ' paid, ' + summary.fail.length +
+                        ' FAILED \u2014 review the summary below.', 'error');
+                } else {
+                    setStatus('Batch complete: all ' + summary.ok.length + ' trees paid.', 'success');
+                }
+            }
 
             function $(id) { return document.getElementById(id); }
             function setStatus(msg, cls) {
@@ -224,6 +1257,71 @@
                 s.textContent = msg;
                 s.className = cls || '';
             }
+            function loadRegistrations() {
+                if (typeof fetch !== 'function') return;
+                const panel = $('recipientsPanel');
+                const list = $('recipientsList');
+                const st = $('recipientsStatus');
+                if (!panel || !list) return;
+                if (st) { st.textContent = 'Loading registered recipients\u2026'; st.className = 'hint loading'; }
+                fetch(PAYOUT_REG_ENDPOINT + '?action=getPendingPayoutRegistrations&status=ALL', { cache: 'no-cache' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        const items = (data && data.data && data.data.items) || [];
+                        const deduped = U.dedupeActiveRegistrations(items);
+                        _maskedKeyByPk = U.maskedKeyByPkHash(deduped);
+                        renderTreeDetails();
+                        renderRegistrations(deduped);
+                    })
+                    .catch(function () {
+                        panel.style.display = 'block';
+                        if (st) { st.textContent = 'Could not load the payout register (the form still works \u2014 type the pk_hash manually).'; st.className = 'hint'; }
+                    });
+            }
+
+            // Renders ONE row per pk_hash. `rows` comes from the privacy-safe dedupe
+            // (masked fields only) -- a raw pix_key can never reach this function.
+            function renderRegistrations(rows) {
+                const panel = $('recipientsPanel');
+                const list = $('recipientsList');
+                const st = $('recipientsStatus');
+                if (!panel || !list) return;
+                list.innerHTML = '';
+                panel.style.display = 'block';
+                if (!rows || !rows.length) {
+                    if (st) { st.textContent = 'No payout registrations recorded yet.'; st.className = 'hint'; }
+                    return;
+                }
+                rows.forEach(function (it) {
+                    const row = document.createElement('div');
+                    row.className = 'recipient-row';
+                    const active = it.status === 'ACTIVE';
+                    const meta = [it.pix_key_type, it.pix_key_masked, it.program_slug, it.submitted_date]
+                        .filter(function (x) { return x; }).join(' \u00b7 ');
+                    row.innerHTML =
+                        '<div class="rp-main">' +
+                            '<div class="rp-pk">' + escapeHtml(it.pk_hash) + '</div>' +
+                            '<div class="rp-meta">' + escapeHtml(meta) + '</div>' +
+                        '</div>' +
+                        '<span class="rp-status' + (active ? ' active' : '') + '">' + escapeHtml(it.status) + '</span>' +
+                        '<button type="button" class="rp-use">Use</button>';
+                    const btn = row.querySelector('button.rp-use');
+                    if (btn) {
+                        btn.addEventListener('click', function () {
+                            const pk = $('recipientPkHash');
+                            if (pk) { pk.value = it.pk_hash; pk.classList.remove('invalid'); }
+                            if (st) {
+                                st.textContent = 'Filled recipient pk_hash ' + it.pk_hash +
+                                    (it.pix_key_masked ? ' (' + it.pix_key_masked + ')' : '') + '.';
+                                st.className = 'hint';
+                            }
+                        });
+                    }
+                    list.appendChild(row);
+                });
+                if (st) { st.textContent = rows.length + ' recipient(s) \u2014 one per pk_hash.'; st.className = 'hint'; }
+            }
+
             function escapeHtml(v) {
                 return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
                     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -271,6 +1369,7 @@
                         return;
                     }
 
+                    _signedInName = data.contributor_name || '';
                     $('welcome').textContent = 'Signed in as ' + (data.contributor_name || '(contributor)');
                     window.Permissions.requireRole({
                         action: PAGE_ACTION,
@@ -280,6 +1379,10 @@
                             $('authBadge').textContent = 'Governor';
                             $('authBadge').className = 'status-badge governor';
                             $('content').style.display = 'block';
+                            loadProgramOptions();
+                            loadFarmPlotOptions();
+                            loadPendingTrees();
+                            loadRegistrations();
                         },
                         onDenied: function () {
                             $('authBadge').textContent = 'Not a governor';
@@ -287,6 +1390,69 @@
                         }
                     });
                 })();
+            }
+
+            function generateReceiptFileName(file) {
+                // Opaque name: the original filename may carry PII (name/CPF) and the
+                // signed payload is republished publicly, so it is discarded entirely.
+                const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                const rand = Array.from(crypto.getRandomValues(new Uint8Array(3)))
+                    .map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+                const ext = (file && file.type === 'application/pdf') ? '.pdf'
+                    : (file && file.type === 'image/png') ? '.png'
+                    : (file && file.type === 'image/jpeg') ? '.jpg'
+                    : (file && file.type === 'image/gif') ? '.gif' : '.bin';
+                return 'payout_' + ts + '_' + rand + ext;
+            }
+
+            function updateReceiptInfo(file) {
+                const el = $('receiptFileName');
+                const area = $('receiptPasteArea');
+                if (file) {
+                    cachedReceiptFileName = generateReceiptFileName(file);
+                    if (el) el.innerHTML = 'Attached: <code>' + cachedReceiptFileName + '</code>';
+                    if (area) { area.classList.add('has-file'); area.textContent = 'Receipt attached \u2014 click to replace'; }
+                } else {
+                    cachedReceiptFileName = null;
+                    if (el) el.textContent = 'Waiting for file selection (optional)\u2026';
+                    if (area) { area.classList.remove('has-file'); area.textContent = 'Click to select or paste (Ctrl+V) the receipt'; }
+                }
+            }
+
+            function handleReceiptFile(file) {
+                if (!file) return;
+                if (['image/png', 'image/jpeg', 'image/gif', 'application/pdf'].indexOf(file.type) === -1) {
+                    setStatus('Unsupported receipt type \u2014 attach an image or PDF.', 'error');
+                    return;
+                }
+                uploadedReceiptFile = file;
+                updateReceiptInfo(file);
+                const preview = $('receipt-file-preview');
+                if (preview) {
+                    if (file.type.indexOf('image/') === 0) {
+                        const r = new FileReader();
+                        r.onload = function (e) { preview.src = e.target.result; preview.style.display = 'block'; };
+                        r.readAsDataURL(file);
+                    } else { preview.style.display = 'none'; preview.src = ''; }
+                }
+                setStatus('');
+            }
+
+            function wireReceiptAttachment() {
+                const area = $('receiptPasteArea');
+                const input = $('receiptFileInput');
+                if (area && input) {
+                    area.addEventListener('click', function () { input.click(); });
+                    input.addEventListener('change', function (e) {
+                        if (e.target.files && e.target.files.length) handleReceiptFile(e.target.files[0]);
+                    });
+                }
+                document.addEventListener('paste', function (e) {
+                    const items = (e.clipboardData || {}).items || [];
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].kind === 'file') { const f = items[i].getAsFile(); if (f) { handleReceiptFile(f); e.preventDefault(); return; } }
+                    }
+                });
             }
 
             function readForm() {
@@ -297,11 +1463,12 @@
                     paidAt: $('paidAt').value,
                     bankRefType: $('bankRefType').value,
                     bankRef: $('bankRef').value,
-                    recipientName: $('recipientName').value,
                     recipientPkHash: $('recipientPkHash').value,
-                    treeIds: $('treeIds').value,
-                    status: $('payoutStatus').value,
+                    treeIds: _selectedTreeId,
+                    status: U.deriveStatus($('paidAt').value),
                     receiptUrl: $('receiptUrl').value,
+                    receiptFileName: cachedReceiptFileName || '',
+                    receiptLocation: cachedReceiptFileName ? RECEIPT_REPO_BASE_URL + cachedReceiptFileName : '',
                     submissionSource: window.location.href
                 };
             }
@@ -311,6 +1478,9 @@
             }
 
             function submit() {
+                // In the post-submit state the button RESETS the form instead of
+                // submitting a second time.
+                if (_awaitingAnotherPayout) { resetForm(); return; }
                 const btn = $('submitButton');
                 clearInvalid();
                 setStatus('');
@@ -322,8 +1492,6 @@
                     if (!U.parseAmount(form.amount).valid) $('amount').classList.add('invalid');
                     if (!U.isValidIso8601(form.paidAt)) $('paidAt').classList.add('invalid');
                     if (!String(form.bankRef).trim()) $('bankRef').classList.add('invalid');
-                    if (!String(form.recipientName).trim()) $('recipientName').classList.add('invalid');
-                    if (!String(form.programSlug).trim()) $('programSlug').classList.add('invalid');
                     setStatus(check.errors.join(' '), 'error');
                     return;
                 }
@@ -361,13 +1529,15 @@
                         const submission = await EdgarSubmission.submitWithRetry({
                             url: EDGAR_SUBMIT,
                             text: shareText,
+                            file: uploadedReceiptFile ? await EdgarSubmission.toSendableBlob(uploadedReceiptFile) : undefined,
+                            fileName: cachedReceiptFileName || undefined,
                             attempts: 3
                         });
                         const result = submission.result || {};
                         $('responsePre').textContent = JSON.stringify(result, null, 2);
 
                         if (result.signature_verification === 'success') {
-                            setStatus('Payout recorded. View: https://truesight.me/submissions/raw-telegram-chatlogs', 'success');
+                            markPaidAndArmReset(form);
                         } else {
                             setStatus('Submitted, but Edgar did not confirm verified delivery — please review the response below.', 'error');
                         }
@@ -379,9 +1549,134 @@
                 })();
             }
 
+            // "Mark tree as invalid": emit the SAME [TREE PLANTING REJECT EVENT] the
+            // monitor-tree-growth page emits, so the governor/sentinel-only GAS
+            // consumer (process_tree_planting_link.js) handles both identically. The
+            // page is governor-gated and the server RE-CHECKS the role, so a stray
+            // click cannot invalidate anything. The payload carries NO recipient
+            // material -- it is republished as a PUBLIC raw chatlog.
+            function rejectTree() {
+                const id = String(_selectedTreeId || '').trim();
+                if (!id) { setStatus('Select a tree first.', 'error'); return; }
+                if (!window.confirm('Mark ' + id + ' as INVALID?\n\nThis removes the tree from the index (it must not touch the sold QR).')) return;
+                const reason = (window.prompt('Reason (optional):', U.TREE_REJECT_DEFAULT_REASON) || '').trim();
+
+                const privateKey = (function () { try { return localStorage.getItem('privateKey'); } catch (_) { return null; } })();
+                if (!privateKey) {
+                    setStatus('Your private key is missing from this browser. Re-register via the Digital Signature Creator.', 'error');
+                    return;
+                }
+
+                const btn = $('markInvalidButton');
+                if (btn) btn.disabled = true;
+                setStatus('Signing and submitting the invalid-marking\u2026', 'loading');
+
+                (async function () {
+                    try {
+                        const helper = new EdgarPayloadHelper({
+                            digitalSignature: publicKeyOrNull(),
+                            generationSource: window.location.href
+                        });
+                        const attributes = U.buildTreeRejectAttributes(id, '', _signedInName, reason);
+                        const gen = await helper.generatePayload({
+                            eventName: U.TREE_REJECT_EVENT_NAME,
+                            attributes: attributes,
+                            privateKey: privateKey,
+                            digitalSignature: publicKeyOrNull(),
+                            generationSource: window.location.href
+                        });
+
+                        // Forensic panel: the verbatim signed payload.
+                        $('requestPre').textContent = gen.shareText;
+                        $('responsePre').textContent = '';
+                        $('submissionResult').style.display = 'block';
+
+                        const submission = await EdgarSubmission.submitWithRetry({
+                            url: EDGAR_SUBMIT, text: gen.shareText, attempts: 3
+                        });
+                        const result = submission.result || {};
+                        $('responsePre').textContent = JSON.stringify(result, null, 2);
+
+                        if (result.signature_verification === 'success') {
+                            setStatus('Marked ' + id + ' as INVALID. It will drop from the tree index shortly.', 'success');
+                        } else {
+                            setStatus('Submitted, but Edgar did not confirm verified delivery \u2014 review the response below.', 'error');
+                        }
+                    } catch (err) {
+                        setStatus('Invalid-marking failed: ' + err.message, 'error');
+                    } finally {
+                        if (btn) btn.disabled = false;
+                    }
+                })();
+            }
+
             window.addEventListener('DOMContentLoaded', function () {
                 boot();
+                // The recipient lookup is now CACHE-FIRST: loadPendingTrees() seeds it
+                // from the feed and only falls back to GAS when the feed carries no
+                // inline recipient_pk_hash. Do not fire the GAS call eagerly here.
                 $('submitButton').addEventListener('click', submit);
+                const batchCb = $('batchMode');
+                if (batchCb) batchCb.addEventListener('change', function () {
+                    _batchMode = !!batchCb.checked;
+                    const panel = $('batchPanel'); if (panel) panel.style.display = _batchMode ? 'block' : 'none';
+                    const single = $('submitButton'); if (single) single.style.display = _batchMode ? 'none' : '';
+                    const bbtn = $('batchSubmitButton'); if (bbtn) bbtn.style.display = _batchMode ? 'block' : 'none';
+                    if (_batchMode) { renderBatchList(); renderBatchSplitNote(); }
+                    setStatus('');
+                });
+                const bAll = $('batchSelectAll');
+                if (bAll) bAll.addEventListener('click', function () {
+                    currentFilteredRows().forEach(function (t) {
+                        var id = String(t.telegram_message_id || t.tree_id || '').trim();
+                        if (id) _batchSelected[id] = 1;
+                    });
+                    renderBatchList();
+                });
+                const bClear = $('batchClearAll');
+                if (bClear) bClear.addEventListener('click', function () { _batchSelected = {}; renderBatchList(); });
+                const bList = $('batchList');
+                if (bList) bList.addEventListener('change', function (e) {
+                    var t = e.target;
+                    if (!t || !t.classList || !t.classList.contains('batch-cb')) return;
+                    if (t.checked) _batchSelected[t.value] = 1; else delete _batchSelected[t.value];
+                    updateBatchCount();
+                });
+                const amtEl = $('amount');
+                if (amtEl) amtEl.addEventListener('input', function () { if (_batchMode) renderBatchSplitNote(); });
+                const bSubmit = $('batchSubmitButton');
+                if (bSubmit) bSubmit.addEventListener('click', submitBatch);
+                const programSel = $('programSlug');
+                if (programSel) programSel.addEventListener('change', function () { renderTreeOptions(); setUrlFilterParams(); });
+                const farmSel = $('farmFilter');
+                if (farmSel) farmSel.addEventListener('change', function () { applyPlotOptions(); renderTreeOptions(); setUrlFilterParams(); });
+                const plotSel = $('plotFilter');
+                if (plotSel) plotSel.addEventListener('change', function () { renderTreeOptions(); setUrlFilterParams(); });
+                const picker = $('treePicker');
+                if (picker) picker.addEventListener('change', addPickedTree);
+                const guardHost = $('overpayGuard');
+                if (guardHost) guardHost.addEventListener('click', function (e) {
+                    const t = e.target;
+                    const btn = t && t.closest ? t.closest('.flagged-pick') : null;
+                    if (!btn) return;
+                    selectTreeById(btn.getAttribute('data-tree-id'));
+                });
+                const markBtn = $('markInvalidButton');
+                if (markBtn) markBtn.addEventListener('click', rejectTree);
+                // Copy-payee-link is delegated on the two card hosts (the cards are
+                // re-rendered, so no per-card listener can be attached once).
+                ['treeDetails', 'overpayTreeDetails'].forEach(function (hostId) {
+                    const host = $(hostId);
+                    if (!host) return;
+                    host.addEventListener('click', function (e) {
+                        const t = e.target;
+                        const link = t && t.closest ? t.closest('a.tc-copy') : null;
+                        if (!link) return;
+                        e.preventDefault();
+                        copyText(link.getAttribute('data-copy-url') || '', link);
+                    });
+                });
+                wireReceiptAttachment();
             });
         })();
     </script>
